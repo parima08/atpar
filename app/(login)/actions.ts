@@ -25,6 +25,7 @@ import {
   validatedAction,
   validatedActionWithUser
 } from '@/lib/auth/middleware';
+import { startTrial } from '@/lib/db/trial';
 
 async function logActivity(
   teamId: number | null | undefined,
@@ -196,6 +197,9 @@ export const signUp = validatedAction(signUpSchema, async (data, formData) => {
 
     teamId = createdTeam.id;
     userRole = 'owner';
+
+    // Start trial period for new teams
+    await startTrial(teamId);
 
     await logActivity(teamId, createdUser.id, ActivityType.CREATE_TEAM);
   }

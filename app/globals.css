@@ -55,6 +55,10 @@
   --radius-lg: var(--radius);
   --radius-md: calc(var(--radius) - 2px);
   --radius-sm: calc(var(--radius) - 4px);
+
+  /* Font families - uses CSS variables from Next.js font loader */
+  --font-sans: var(--font-dm-sans), "DM Sans", system-ui, sans-serif;
+  --font-display: var(--font-fraunces), "Fraunces", Georgia, serif;
 }
 
 /*
@@ -259,6 +263,61 @@
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
+
+  /* AtPar Brand Colors */
+  --color-atpar-primary: #0D7377;
+  --color-atpar-primary-dark: #0A5C5F;
+  --color-atpar-primary-light: #E6F4F4;
+  --color-atpar-accent: #F59E0B;
+  --color-atpar-accent-hover: #D97706;
+  --color-atpar-bg: #FAFAF7;
+  --color-atpar-surface: #FFFFFF;
+  --color-atpar-text: #1C1917;
+  --color-atpar-text-muted: #57534E;
+  --color-atpar-text-light: #78716C;
+  --color-atpar-border: #E7E5E4;
+  --color-atpar-border-light: #F5F5F0;
+  --color-atpar-success: #059669;
+
+  /* AtPar Animations */
+  --animate-fadeInUp: fadeInUp 0.6s ease both;
+}
+
+/* AtPar Animation Keyframes */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* AtPar Animation Utilities */
+.animate-fadeInUp {
+  animation: fadeInUp 0.6s ease both;
+}
+
+.animate-fadeInUp-delay-1 {
+  animation: fadeInUp 0.6s ease 0.1s both;
+}
+
+.animate-fadeInUp-delay-2 {
+  animation: fadeInUp 0.6s ease 0.2s both;
+}
+
+.animate-fadeInUp-delay-3 {
+  animation: fadeInUp 0.6s ease 0.3s both;
+}
+
+.animate-fadeInUp-delay-4 {
+  animation: fadeInUp 0.6s ease 0.4s both;
+}
+
+.animate-fadeInUp-delay-5 {
+  animation: fadeInUp 0.6s ease 0.5s both;
 }
 
 /*

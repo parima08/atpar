@@ -5,6 +5,8 @@ import {
   text,
   timestamp,
   integer,
+  json,
+  boolean,
 } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
 
@@ -29,6 +31,9 @@ export const teams = pgTable('teams', {
   stripeProductId: text('stripe_product_id'),
   planName: varchar('plan_name', { length: 50 }),
   subscriptionStatus: varchar('subscription_status', { length: 20 }),
+  // Trial period fields
+  trialStartedAt: timestamp('trial_started_at'),
+  trialEndsAt: timestamp('trial_ends_at'),
 });
 
 export const teamMembers = pgTable('team_members', {
@@ -140,3 +145,88 @@ export enum ActivityType {
   INVITE_TEAM_MEMBER = 'INVITE_TEAM_MEMBER',
   ACCEPT_INVITATION = 'ACCEPT_INVITATION',
 }
+
+// ============================================
+// Sync Configuration Tables
+// ============================================
+
+/**
+ * Stores the sync configuration for a team
+ * Each team can have one sync configuration
+ */
+export const syncConfigs = pgTable('sync_configs', {
+  id: serial('id').primaryKey(),
+  teamId: integer('team_id')
+    .notNull()
+    .references(() => teams.id)
+    .unique(),
+  
+  // Credentials (stored per-team)
+  notionToken: text('notion_token'),
+  adoPat: text('ado_pat'),
+  adoOrgUrl: varchar('ado_org_url', { length: 500 }),
+
+  // Notion settings - array of database IDs (up to 5)
+  notionDatabaseIds: json('notion_database_ids').$type<string[]>().default([]),
+
+  // ADO settings
+  adoProject: varchar('ado_project', { length: 255 }),
+
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+});
+
+/**
+ * Stores the history of sync runs
+ */
+export const syncHistory = pgTable('sync_history', {
+  id: serial('id').primaryKey(),
+  teamId: integer('team_id')
+    .notNull()
+    .references(() => teams.id),
+  
+  // Sync details
+  direction: varchar('direction', { length: 50 }).notNull(), // 'both', 'notion-to-ado', 'ado-to-notion'
+  dryRun: boolean('dry_run').notNull().default(false),
+  
+  // Results
+  created: integer('created').notNull().default(0),
+  updated: integer('updated').notNull().default(0),
+  updatedInNotion: integer('updated_in_notion').notNull().default(0),
+  skipped: integer('skipped').notNull().default(0),
+  errorCount: integer('error_count').notNull().default(0),
+  
+  // Error details (stored as JSON array)
+  errors: json('errors').$type<Array<{ notionId: string; title: string; error: string }>>().default([]),
+  
+  // Logs (stored as JSON array of log messages)
+  logs: json('logs').$type<string[]>().default([]),
+  
+  // Timing
+  startedAt: timestamp('started_at').notNull().defaultNow(),
+  completedAt: timestamp('completed_at'),
+  
+  // Status
+  status: varchar('status', { length: 20 }).notNull().default('running'), // 'running', 'completed', 'failed'
+});
+
+// Relations for sync tables
+export const syncConfigsRelations = relations(syncConfigs, ({ one }) => ({
+  team: one(teams, {
+    fields: [syncConfigs.teamId],
+    references: [teams.id],
+  }),
+}));
+
+export const syncHistoryRelations = relations(syncHistory, ({ one }) => ({
+  team: one(teams, {
+    fields: [syncHistory.teamId],
+    references: [teams.id],
+  }),
+}));
+
+// Type exports for sync tables
+export type SyncConfig = typeof syncConfigs.$inferSelect;
+export type NewSyncConfig = typeof syncConfigs.$inferInsert;
+export type SyncHistory = typeof syncHistory.$inferSelect;
+export type NewSyncHistory = typeof syncHistory.$inferInsert;

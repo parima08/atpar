@@ -12,39 +12,46 @@ export default async function PricingPage() {
     getStripeProducts(),
   ]);
 
-  const basePlan = products.find((product) => product.name === 'Base');
-  const plusPlan = products.find((product) => product.name === 'Plus');
+  // Look for "Pro" or "AtPar" product in Stripe
+  const atParPlan = products.find(
+    (product) =>
+      product.name === 'Pro' ||
+      product.name === 'AtPar' ||
+      product.name.toLowerCase().includes('atpar')
+  );
 
-  const basePrice = prices.find((price) => price.productId === basePlan?.id);
-  const plusPrice = prices.find((price) => price.productId === plusPlan?.id);
+  const atParPrice = prices.find(
+    (price) => price.productId === atParPlan?.id
+  );
 
   return (
     <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-      <div className="grid md:grid-cols-2 gap-8 max-w-xl mx-auto">
+      <div className="text-center mb-12">
+        <h1 className="text-4xl font-bold text-gray-900 mb-4">
+          Simple, transparent pricing
+        </h1>
+        <p className="text-lg text-gray-600">
+          Start with a 14-day free trial. No credit card required.
+        </p>
+      </div>
+      <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
         <PricingCard
-          name={basePlan?.name || 'Base'}
-          price={basePrice?.unitAmount || 800}
-          interval={basePrice?.interval || 'month'}
-          trialDays={basePrice?.trialPeriodDays || 7}
+          name="AtPar"
+          price={atParPrice?.unitAmount || 5000}
+          interval={atParPrice?.interval || 'month'}
+          trialDays={14}
+          subtitle="$50 per team, per month"
+          description="No per-seat fees. No usage limits."
           features={[
-            'Unlimited Usage',
-            'Unlimited Workspace Members',
-            'Email Support',
+            'Up to 10 active synced Notion databases',
+            'Unlimited users',
+            'Unlimited Azure DevOps projects',
+            'Task + status + docs sync',
+            'Cancel anytime',
           ]}
-          priceId={basePrice?.id}
+          priceId={atParPrice?.id}
         />
-        <PricingCard
-          name={plusPlan?.name || 'Plus'}
-          price={plusPrice?.unitAmount || 1200}
-          interval={plusPrice?.interval || 'month'}
-          trialDays={plusPrice?.trialPeriodDays || 7}
-          features={[
-            'Everything in Base, and:',
-            'Early Access to New Features',
-            '24/7 Support + Slack Access',
-          ]}
-          priceId={plusPrice?.id}
-        />
+        <EnterprisePricingCard />
       </div>
     </main>
   );
@@ -55,6 +62,8 @@ function PricingCard({
   price,
   interval,
   trialDays,
+  subtitle,
+  description,
   features,
   priceId,
 }: {
@@ -62,33 +71,73 @@ function PricingCard({
   price: number;
   interval: string;
   trialDays: number;
+  subtitle: string;
+  description: string;
   features: string[];
   priceId?: string;
 }) {
   return (
-    <div className="pt-6">
-      <h2 className="text-2xl font-medium text-gray-900 mb-2">{name}</h2>
-      <p className="text-sm text-gray-600 mb-4">
-        with {trialDays} day free trial
+    <div className="rounded-2xl border border-gray-200 bg-white p-8 shadow-sm">
+      <h2 className="text-2xl font-bold text-gray-900 mb-2">{name}</h2>
+      <p className="text-sm text-gray-500 mb-6">
+        {trialDays}-day free trial
       </p>
-      <p className="text-4xl font-medium text-gray-900 mb-6">
-        ${price / 100}{' '}
-        <span className="text-xl font-normal text-gray-600">
-          per user / {interval}
-        </span>
+      <p className="text-4xl font-bold text-gray-900 mb-1">
+        ${price / 100}
+        <span className="text-lg font-normal text-gray-500">/{interval}</span>
       </p>
-      <ul className="space-y-4 mb-8">
-        {features.map((feature, index) => (
-          <li key={index} className="flex items-start">
-            <Check className="h-5 w-5 text-orange-500 mr-2 mt-0.5 flex-shrink-0" />
-            <span className="text-gray-700">{feature}</span>
-          </li>
-        ))}
-      </ul>
-      <form action={checkoutAction}>
+      <p className="text-sm text-gray-600 mb-2">{subtitle}</p>
+      <p className="text-sm text-gray-500 mb-6">{description}</p>
+      <form action={checkoutAction} className="mb-6">
         <input type="hidden" name="priceId" value={priceId} />
         <SubmitButton />
       </form>
+      <ul className="space-y-3">
+        {features.map((feature, index) => (
+          <li key={index} className="flex items-start">
+            <Check className="h-5 w-5 text-green-500 mr-3 mt-0.5 flex-shrink-0" />
+            <span className="text-gray-700 text-sm">{feature}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function EnterprisePricingCard() {
+  return (
+    <div className="rounded-2xl border border-gray-200 bg-gradient-to-br from-gray-50 to-gray-100 p-8 shadow-sm">
+      <h2 className="text-2xl font-bold text-gray-900 mb-2">AtPar Enterprise</h2>
+      <p className="text-sm text-gray-500 mb-6">
+        For teams with advanced needs
+      </p>
+      <p className="text-4xl font-bold text-gray-900 mb-1">Custom</p>
+      <p className="text-sm text-gray-600 mb-2">Contact us for pricing</p>
+      <p className="text-sm text-gray-500 mb-6">Tailored to your organization</p>
+      <a
+        href="mailto:sales@atpar.io"
+        className="block w-full text-center bg-gray-900 text-white rounded-lg py-3 px-4 font-medium hover:bg-gray-800 transition-colors mb-6"
+      >
+        Contact Sales
+      </a>
+      <p className="text-sm font-medium text-gray-700 mb-3">
+        Everything in AtPar, plus:
+      </p>
+      <ul className="space-y-3">
+        {[
+          'Unlimited synced Notion databases',
+          'Wiki page syncing',
+          'Advanced security & compliance',
+          'SSO / SAML authentication',
+          'Dedicated support',
+          'Custom integrations',
+        ].map((feature, index) => (
+          <li key={index} className="flex items-start">
+            <Check className="h-5 w-5 text-green-500 mr-3 mt-0.5 flex-shrink-0" />
+            <span className="text-gray-700 text-sm">{feature}</span>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
