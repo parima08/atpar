@@ -8,6 +8,15 @@ import type { NotionItem, AdoWorkItem, SyncConfig, SyncResult } from './types';
 
 export type SyncDirection = 'both' | 'notion-to-ado' | 'ado-to-notion';
 
+export interface SyncItemDetail {
+  id: string;
+  title: string;
+  status: string | null;
+  adoId?: string | null;
+  action: 'created' | 'updated' | 'updated_in_notion' | 'skipped' | 'error';
+  actionDetail?: string;
+}
+
 export class SyncService {
   private notionClient: NotionClient;
   private adoClient: AdoClient;
@@ -25,10 +34,15 @@ export class SyncService {
 
   private dryRun: boolean = false;
   private logs: string[] = [];
+  private items: SyncItemDetail[] = [];
 
   private log(message: string) {
     console.log(message);
     this.logs.push(message);
+  }
+
+  private addItem(item: SyncItemDetail) {
+    this.items.push(item);
   }
 
   /**
@@ -41,9 +55,10 @@ export class SyncService {
     limit?: number,
     dryRun: boolean = false,
     direction: SyncDirection = 'both'
-  ): Promise<SyncResult & { logs: string[] }> {
+  ): Promise<SyncResult & { logs: string[]; items: SyncItemDetail[] }> {
     this.dryRun = dryRun;
     this.logs = [];
+    this.items = [];
 
     const result: SyncResult = {
       created: 0,
@@ -64,7 +79,7 @@ export class SyncService {
     }
 
     this.logResults(result);
-    return { ...result, logs: this.logs };
+    return { ...result, logs: this.logs, items: this.items };
   }
 
   /**
@@ -94,6 +109,14 @@ export class SyncService {
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
         this.log(`Error processing item "${item.title}": ${errorMessage}`);
+        this.addItem({
+          id: item.id,
+          title: item.title,
+          status: item.status,
+          adoId: item.adoId,
+          action: 'error',
+          actionDetail: errorMessage,
+        });
         result.errors.push({
           notionId: item.id,
           title: item.title,
@@ -123,6 +146,14 @@ export class SyncService {
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
         this.log(`Error processing ADO item #${adoItem.id} "${adoItem.title}": ${errorMessage}`);
+        this.addItem({
+          id: adoItem.notionId || `ado-${adoItem.id}`,
+          title: adoItem.title,
+          status: adoItem.state,
+          adoId: String(adoItem.id),
+          action: 'error',
+          actionDetail: errorMessage,
+        });
         result.errors.push({
           notionId: adoItem.notionId || 'unknown',
           title: adoItem.title,
@@ -142,6 +173,14 @@ export class SyncService {
     // Skip if we don't have a Notion ID
     if (!adoItem.notionId) {
       this.log(`Skipping ADO #${adoItem.id} - no Notion ID found in tags`);
+      this.addItem({
+        id: `ado-${adoItem.id}`,
+        title: adoItem.title,
+        status: adoItem.state,
+        adoId: String(adoItem.id),
+        action: 'skipped',
+        actionDetail: 'No Notion ID found',
+      });
       result.skipped++;
       return;
     }
@@ -150,6 +189,14 @@ export class SyncService {
     const notionItem = await this.notionClient.getItemById(adoItem.notionId);
     if (!notionItem) {
       this.log(`Notion page ${adoItem.notionId} not found for ADO #${adoItem.id}`);
+      this.addItem({
+        id: adoItem.notionId,
+        title: adoItem.title,
+        status: adoItem.state,
+        adoId: String(adoItem.id),
+        action: 'skipped',
+        actionDetail: 'Notion page not found',
+      });
       result.skipped++;
       return;
     }
@@ -161,6 +208,14 @@ export class SyncService {
     // If we can't determine timestamps, skip
     if (!adoChangedDate || !notionEditedDate) {
       this.log(`Skipping "${adoItem.title}" - cannot compare timestamps`);
+      this.addItem({
+        id: notionItem.id,
+        title: adoItem.title,
+        status: adoItem.state,
+        adoId: String(adoItem.id),
+        action: 'skipped',
+        actionDetail: 'Cannot compare timestamps',
+      });
       result.skipped++;
       return;
     }
@@ -168,6 +223,14 @@ export class SyncService {
     // If Notion is newer or same, skip (Notion -> ADO sync will handle it)
     if (notionEditedDate >= adoChangedDate) {
       this.log(`Skipping "${adoItem.title}" - Notion is newer or equal`);
+      this.addItem({
+        id: notionItem.id,
+        title: adoItem.title,
+        status: adoItem.state,
+        adoId: String(adoItem.id),
+        action: 'skipped',
+        actionDetail: 'Notion is newer',
+      });
       result.skipped++;
       return;
     }
@@ -193,6 +256,14 @@ export class SyncService {
     // If nothing changed, skip
     if (changes.length === 0) {
       this.log(`Skipping "${adoItem.title}" - no changes detected`);
+      this.addItem({
+        id: notionItem.id,
+        title: adoItem.title,
+        status: adoItem.state,
+        adoId: String(adoItem.id),
+        action: 'skipped',
+        actionDetail: 'No changes detected',
+      });
       result.skipped++;
       return;
     }
@@ -200,6 +271,14 @@ export class SyncService {
     if (this.dryRun) {
       this.log(`[DRY RUN] Would update Notion from ADO #${adoItem.id}: "${adoItem.title}"`);
       this.log(`  Changes: ${changes.join(', ')}`);
+      this.addItem({
+        id: notionItem.id,
+        title: adoItem.title,
+        status: adoItem.state,
+        adoId: String(adoItem.id),
+        action: 'updated_in_notion',
+        actionDetail: `Would update: ${changes.join(', ')}`,
+      });
       result.updatedInNotion++;
       return;
     }
@@ -215,6 +294,15 @@ export class SyncService {
       assigneeChanged ? mappedNotionAssignee : null
     );
 
+    this.addItem({
+      id: notionItem.id,
+      title: adoItem.title,
+      status: adoItem.state,
+      adoId: String(adoItem.id),
+      action: 'updated_in_notion',
+      actionDetail: changes.join(', '),
+    });
+
     result.updatedInNotion++;
   }
 
@@ -229,6 +317,13 @@ export class SyncService {
     // skip this item to avoid overwriting the manual link
     if (!item.adoId && item.adoUrl) {
       this.log(`Skipping "${item.title}" - has manual ADO link: ${item.adoUrl}`);
+      this.addItem({
+        id: item.id,
+        title: item.title,
+        status: item.status,
+        action: 'skipped',
+        actionDetail: 'Has manual ADO link',
+      });
       result.skipped++;
       return;
     }
@@ -259,6 +354,13 @@ export class SyncService {
       if (item.subtaskIds.length > 0) {
         this.log(`  Subtasks: ${item.subtaskIds.length} tasks would be created`);
       }
+      this.addItem({
+        id: item.id,
+        title: item.title,
+        status: item.status,
+        action: 'created',
+        actionDetail: `Would create in ADO with state: ${mappedState}`,
+      });
       result.created++;
       return;
     }
@@ -281,6 +383,15 @@ export class SyncService {
     await this.notionClient.updatePbiUrl(item.id, adoUrl);
     
     this.log(`  Created ADO PBI #${pbi.id}: ${adoUrl}`);
+
+    this.addItem({
+      id: item.id,
+      title: item.title,
+      status: item.status,
+      adoId: String(pbi.id),
+      action: 'created',
+      actionDetail: `Created ADO PBI #${pbi.id}`,
+    });
 
     // Create Tasks for subtasks
     if (item.subtaskIds.length > 0) {
@@ -329,12 +440,28 @@ export class SyncService {
     
     if (isNaN(adoId)) {
       this.log(`Invalid ADO ID "${item.adoId}" for item "${item.title}"`);
+      this.addItem({
+        id: item.id,
+        title: item.title,
+        status: item.status,
+        adoId: item.adoId,
+        action: 'skipped',
+        actionDetail: `Invalid ADO ID: ${item.adoId}`,
+      });
       result.skipped++;
       return;
     }
 
     if (this.dryRun) {
       this.log(`[DRY RUN] Would check/update PBI #${adoId}: "${item.title}"`);
+      this.addItem({
+        id: item.id,
+        title: item.title,
+        status: item.status,
+        adoId: String(adoId),
+        action: 'skipped',
+        actionDetail: 'Dry run - would check for updates',
+      });
       result.skipped++;
       return;
     }
@@ -344,6 +471,14 @@ export class SyncService {
     
     if (!currentPbi) {
       this.log(`ADO work item #${adoId} not found for "${item.title}"`);
+      this.addItem({
+        id: item.id,
+        title: item.title,
+        status: item.status,
+        adoId: String(adoId),
+        action: 'skipped',
+        actionDetail: `ADO work item #${adoId} not found`,
+      });
       result.skipped++;
       return;
     }
@@ -351,6 +486,14 @@ export class SyncService {
     // Check if state has changed
     if (currentPbi.state === adoState) {
       this.log(`Skipping "${item.title}" - no state change`);
+      this.addItem({
+        id: item.id,
+        title: item.title,
+        status: item.status,
+        adoId: String(adoId),
+        action: 'skipped',
+        actionDetail: `No state change (ADO: ${currentPbi.state})`,
+      });
       result.skipped++;
       return;
     }
@@ -359,6 +502,14 @@ export class SyncService {
     this.log(`Updating PBI #${adoId}: "${item.title}" (${currentPbi.state} -> ${adoState})`);
     try {
       await this.adoClient.updatePBI(adoId, adoState, item.assignee);
+      this.addItem({
+        id: item.id,
+        title: item.title,
+        status: item.status,
+        adoId: String(adoId),
+        action: 'updated',
+        actionDetail: `Updated state: ${currentPbi.state} → ${adoState}`,
+      });
       result.updated++;
     } catch (error) {
       // Get error message - Azure DevOps errors may have message in different places
@@ -376,6 +527,14 @@ export class SyncService {
         this.log(`  Cannot transition from "${currentPbi.state}" to "${adoState}" - skipping update`);
         this.log(`     This may be due to ADO state transition rules or an invalid state value.`);
         this.log(`     Notion status: "${item.status}" → ADO state: "${adoState}"`);
+        this.addItem({
+          id: item.id,
+          title: item.title,
+          status: item.status,
+          adoId: String(adoId),
+          action: 'skipped',
+          actionDetail: `Cannot transition: ${currentPbi.state} → ${adoState}`,
+        });
         result.skipped++;
       } else {
         // Re-throw other errors

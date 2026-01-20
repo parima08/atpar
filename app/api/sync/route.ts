@@ -145,6 +145,7 @@ export async function POST(request: NextRequest) {
           errorCount: result.errors.length,
         },
         logs: result.logs,
+        items: result.items,
       });
     } catch (syncError) {
       // Update history record with failure
