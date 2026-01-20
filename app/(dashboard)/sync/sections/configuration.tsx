@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Combobox, ComboboxOption } from '@/components/ui/combobox';
-import { CheckCircle, XCircle, Loader2, Save, RefreshCcw, ExternalLink, ChevronDown, ChevronUp, Database, Eye, EyeOff } from 'lucide-react';
+import { CheckCircle, XCircle, Loader2, Save, RefreshCcw, ExternalLink, ChevronDown, ChevronUp, Database, Eye, EyeOff, Link2, Unlink, Key } from 'lucide-react';
 
 interface NotionDatabase {
   id: string;
@@ -20,10 +20,13 @@ interface AdoProject {
 
 interface Config {
   notionToken: string;
+  adoAuthType: 'pat' | 'oauth';
   adoPat: string;
   adoOrgUrl: string;
   adoProject: string;
   notionDatabaseIds: string[];
+  adoOAuthConnected: boolean;
+  adoOAuthUserEmail: string | null;
 }
 
 interface ConfigurationSectionProps {
@@ -37,11 +40,15 @@ export function ConfigurationSection({ onSaveSuccess }: ConfigurationSectionProp
   const [adoProjects, setAdoProjects] = useState<AdoProject[]>([]);
   const [config, setConfig] = useState<Config>({
     notionToken: '',
+    adoAuthType: 'oauth',
     adoPat: '',
     adoOrgUrl: '',
     adoProject: '',
     notionDatabaseIds: ['', '', '', '', ''],
+    adoOAuthConnected: false,
+    adoOAuthUserEmail: null,
   });
+  const [disconnectingOAuth, setDisconnectingOAuth] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [testingAdo, setTestingAdo] = useState(false);
@@ -69,11 +76,20 @@ export function ConfigurationSection({ onSaveSuccess }: ConfigurationSectionProp
         }
         setConfig({
           notionToken: data.notionToken || '',
+          adoAuthType: data.adoAuthType || 'pat',
           adoPat: data.adoPat || '',
           adoOrgUrl: data.adoOrgUrl || '',
           adoProject: data.adoProject || '',
           notionDatabaseIds: databaseIds,
+          adoOAuthConnected: data.adoOAuthConnected || false,
+          adoOAuthUserEmail: data.adoOAuthUserEmail || null,
         });
+        
+        // Set ADO connected status for OAuth
+        if (data.adoOAuthConnected) {
+          setAdoConnected(true);
+          setAdoMessage(`Connected as ${data.adoOAuthUserEmail || 'Azure DevOps user'}`);
+        }
         
         if (data.notionToken && data.notionToken.length > 20) {
           loadNotionDatabases(data.notionToken);
@@ -167,13 +183,24 @@ export function ConfigurationSection({ onSaveSuccess }: ConfigurationSectionProp
     try {
       const filteredDatabaseIds = config.notionDatabaseIds.filter(id => id.trim() !== '');
       
+      // Prepare config data based on auth type
+      const configToSave: Record<string, unknown> = {
+        notionToken: config.notionToken,
+        adoAuthType: config.adoAuthType,
+        adoProject: config.adoProject,
+        adoOrgUrl: config.adoOrgUrl,
+        notionDatabaseIds: filteredDatabaseIds,
+      };
+      
+      // Only include PAT if using PAT auth
+      if (config.adoAuthType === 'pat') {
+        configToSave.adoPat = config.adoPat;
+      }
+      
       const response = await fetch('/api/config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...config,
-          notionDatabaseIds: filteredDatabaseIds,
-        }),
+        body: JSON.stringify(configToSave),
       });
       if (response.ok) {
         setSaveSuccess(true);
@@ -223,48 +250,183 @@ export function ConfigurationSection({ onSaveSuccess }: ConfigurationSectionProp
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
+            {/* Auth Type Toggle */}
             <div>
-              <Label htmlFor="adoOrgUrl">Organization URL</Label>
-              <Input
-                id="adoOrgUrl"
-                placeholder="https://dev.azure.com/your-org"
-                value={config.adoOrgUrl}
-                onChange={(e) => setConfig({ ...config, adoOrgUrl: e.target.value })}
-              />
-              <p className="text-xs text-gray-500 mt-1">
-                e.g., https://dev.azure.com/mycompany
-              </p>
-            </div>
-
-            <div>
-              <Label htmlFor="adoPat">Personal Access Token</Label>
-              <div className="relative">
-                <Input
-                  id="adoPat"
-                  type={showAdoPat ? 'text' : 'password'}
-                  placeholder="Enter your PAT"
-                  value={config.adoPat}
-                  onChange={(e) => setConfig({ ...config, adoPat: e.target.value })}
-                  className="pr-10"
-                />
+              <Label className="text-sm font-medium mb-2 block">Connection Method</Label>
+              <div className="grid grid-cols-2 gap-2">
                 <button
                   type="button"
-                  onClick={() => setShowAdoPat(!showAdoPat)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 z-10 cursor-pointer"
-                  aria-label={showAdoPat ? "Hide password" : "Show password"}
+                  onClick={() => setConfig({ ...config, adoAuthType: 'oauth' })}
+                  className={`p-3 rounded-lg border-2 text-left transition-colors ${
+                    config.adoAuthType === 'oauth'
+                      ? 'border-[#0D7377] bg-[#E6F4F4]'
+                      : 'border-gray-200 hover:border-gray-300'
+                  }`}
                 >
-                  {showAdoPat ? (
-                    <EyeOff className="h-4 w-4" />
-                  ) : (
-                    <Eye className="h-4 w-4" />
-                  )}
+                  <div className="flex items-center gap-2">
+                    <Link2 className={`h-4 w-4 ${config.adoAuthType === 'oauth' ? 'text-[#0D7377]' : 'text-gray-500'}`} />
+                    <span className="font-medium text-sm">OAuth</span>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">Recommended</p>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setConfig({ ...config, adoAuthType: 'pat' })}
+                  className={`p-3 rounded-lg border-2 text-left transition-colors ${
+                    config.adoAuthType === 'pat'
+                      ? 'border-[#0D7377] bg-[#E6F4F4]'
+                      : 'border-gray-200 hover:border-gray-300'
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <Key className={`h-4 w-4 ${config.adoAuthType === 'pat' ? 'text-[#0D7377]' : 'text-gray-500'}`} />
+                    <span className="font-medium text-sm">PAT</span>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">Manual token</p>
                 </button>
               </div>
-              <p className="text-xs text-gray-500 mt-1">
-                Requires Work Items read/write scope
-              </p>
             </div>
 
+            {/* OAuth Section */}
+            {config.adoAuthType === 'oauth' && (
+              <div className="space-y-3 p-4 bg-gray-50 rounded-lg">
+                {config.adoOAuthConnected ? (
+                  <>
+                    <div className="flex items-center gap-2 text-green-600">
+                      <CheckCircle className="h-5 w-5" />
+                      <span className="font-medium">Connected</span>
+                    </div>
+                    {config.adoOAuthUserEmail && (
+                      <p className="text-sm text-gray-600">
+                        Signed in as <span className="font-medium">{config.adoOAuthUserEmail}</span>
+                      </p>
+                    )}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={async () => {
+                        setDisconnectingOAuth(true);
+                        try {
+                          const response = await fetch('/api/auth/ado/disconnect', { method: 'POST' });
+                          if (response.ok) {
+                            setConfig({ ...config, adoOAuthConnected: false, adoOAuthUserEmail: null });
+                            setAdoConnected(false);
+                            setAdoMessage('');
+                          }
+                        } catch (error) {
+                          console.error('Failed to disconnect:', error);
+                        } finally {
+                          setDisconnectingOAuth(false);
+                        }
+                      }}
+                      disabled={disconnectingOAuth}
+                      className="text-red-600 border-red-200 hover:bg-red-50"
+                    >
+                      {disconnectingOAuth ? (
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      ) : (
+                        <Unlink className="h-4 w-4 mr-2" />
+                      )}
+                      Disconnect
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-sm text-gray-600">
+                      Connect your Azure DevOps account to enable sync. This uses secure OAuth authentication.
+                    </p>
+                    <Button
+                      onClick={() => {
+                        window.location.href = '/api/auth/ado';
+                      }}
+                      className="w-full bg-[#0078D4] hover:bg-[#106EBE]"
+                    >
+                      <Link2 className="h-4 w-4 mr-2" />
+                      Connect Azure DevOps
+                    </Button>
+                  </>
+                )}
+              </div>
+            )}
+
+            {/* PAT Section */}
+            {config.adoAuthType === 'pat' && (
+              <>
+                <div>
+                  <Label htmlFor="adoOrgUrl">Organization URL</Label>
+                  <Input
+                    id="adoOrgUrl"
+                    placeholder="https://dev.azure.com/your-org"
+                    value={config.adoOrgUrl}
+                    onChange={(e) => setConfig({ ...config, adoOrgUrl: e.target.value })}
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    e.g., https://dev.azure.com/mycompany
+                  </p>
+                </div>
+
+                <div>
+                  <Label htmlFor="adoPat">Personal Access Token</Label>
+                  <div className="relative">
+                    <Input
+                      id="adoPat"
+                      type={showAdoPat ? 'text' : 'password'}
+                      placeholder="Enter your PAT"
+                      value={config.adoPat}
+                      onChange={(e) => setConfig({ ...config, adoPat: e.target.value })}
+                      className="pr-10"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowAdoPat(!showAdoPat)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 z-10 cursor-pointer"
+                      aria-label={showAdoPat ? "Hide password" : "Show password"}
+                    >
+                      {showAdoPat ? (
+                        <EyeOff className="h-4 w-4" />
+                      ) : (
+                        <Eye className="h-4 w-4" />
+                      )}
+                    </button>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Requires Work Items read/write scope
+                  </p>
+                </div>
+
+                <Button
+                  variant="outline"
+                  onClick={testAdoConnection}
+                  disabled={testingAdo || !config.adoPat || !config.adoOrgUrl}
+                  className="w-full"
+                >
+                  {testingAdo ? (
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  ) : (
+                    <RefreshCcw className="h-4 w-4 mr-2" />
+                  )}
+                  Test Connection
+                </Button>
+              </>
+            )}
+
+            {/* Organization URL for OAuth (shown after connected) */}
+            {config.adoAuthType === 'oauth' && config.adoOAuthConnected && (
+              <div>
+                <Label htmlFor="adoOrgUrl">Organization URL</Label>
+                <Input
+                  id="adoOrgUrl"
+                  placeholder="https://dev.azure.com/your-org"
+                  value={config.adoOrgUrl}
+                  onChange={(e) => setConfig({ ...config, adoOrgUrl: e.target.value })}
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  e.g., https://dev.azure.com/mycompany
+                </p>
+              </div>
+            )}
+
+            {/* Project Selection - shown for both auth types */}
             <div>
               <Label htmlFor="adoProject">Project Name</Label>
               {adoProjects.length > 0 ? (
@@ -290,20 +452,6 @@ export function ConfigurationSection({ onSaveSuccess }: ConfigurationSectionProp
                 />
               )}
             </div>
-
-            <Button
-              variant="outline"
-              onClick={testAdoConnection}
-              disabled={testingAdo || !config.adoPat || !config.adoOrgUrl}
-              className="w-full"
-            >
-              {testingAdo ? (
-                <Loader2 className="h-4 w-4 animate-spin mr-2" />
-              ) : (
-                <RefreshCcw className="h-4 w-4 mr-2" />
-              )}
-              Test Connection
-            </Button>
 
             {adoMessage && (
               <p className={`text-sm ${adoConnected ? 'text-green-600' : 'text-red-600'}`}>

@@ -163,14 +163,47 @@ export const syncConfigs = pgTable('sync_configs', {
   
   // Credentials (stored per-team)
   notionToken: text('notion_token'),
+  
+  // ADO Authentication - supports both PAT and OAuth
+  adoAuthType: varchar('ado_auth_type', { length: 20 }).default('pat'), // 'pat' | 'oauth'
   adoPat: text('ado_pat'),
   adoOrgUrl: varchar('ado_org_url', { length: 500 }),
+  
+  // ADO OAuth fields
+  adoOAuthAccessToken: text('ado_oauth_access_token'),
+  adoOAuthRefreshToken: text('ado_oauth_refresh_token'),
+  adoOAuthTokenExpiresAt: timestamp('ado_oauth_token_expires_at'),
+  adoOAuthUserId: varchar('ado_oauth_user_id', { length: 255 }),
+  adoOAuthUserEmail: varchar('ado_oauth_user_email', { length: 255 }),
+  adoOAuthOrgId: varchar('ado_oauth_org_id', { length: 255 }),
+  adoWebhookSubscriptionId: varchar('ado_webhook_subscription_id', { length: 255 }),
 
   // Notion settings - array of database IDs (up to 5)
   notionDatabaseIds: json('notion_database_ids').$type<string[]>().default([]),
+  
+  // Notion property mappings
+  notionStatusProperty: varchar('notion_status_property', { length: 255 }).default('Status'),
+  notionAssigneeProperty: varchar('notion_assignee_property', { length: 255 }).default('Assignee'),
+  notionDescriptionProperty: varchar('notion_description_property', { length: 255 }).default('Description'),
+  notionAdoIdProperty: varchar('notion_ado_id_property', { length: 255 }).default('ADO ID'),
+  notionPbiUrlProperty: varchar('notion_pbi_url_property', { length: 255 }).default('PBI'),
+  notionSubtaskProperty: varchar('notion_subtask_property', { length: 255 }),
 
   // ADO settings
   adoProject: varchar('ado_project', { length: 255 }),
+  adoAreaPath: varchar('ado_area_path', { length: 500 }),
+  adoWorkType: varchar('ado_work_type', { length: 255 }),
+  adoWorkTypeField: varchar('ado_work_type_field', { length: 255 }),
+  
+  // Status and assignee mappings (JSON objects)
+  statusMapping: json('status_mapping').$type<Record<string, string>>().default({}),
+  reverseStatusMapping: json('reverse_status_mapping').$type<Record<string, string>>().default({}),
+  assigneeMapping: json('assignee_mapping').$type<Record<string, string>>().default({}),
+  reverseAssigneeMapping: json('reverse_assignee_mapping').$type<Record<string, string>>().default({}),
+  
+  // Default values
+  defaultAdoState: varchar('default_ado_state', { length: 100 }).default('New'),
+  defaultNotionStatus: varchar('default_notion_status', { length: 100 }).default('Not started'),
 
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),

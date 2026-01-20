@@ -27,18 +27,31 @@ export async function GET(request: NextRequest) {
         id: null,
         teamId,
         notionToken: '',
+        adoAuthType: 'pat',
         adoPat: '',
         adoOrgUrl: '',
+        adoOAuthConnected: false,
+        adoOAuthUserEmail: null,
         notionDatabaseIds: [],
         adoProject: '',
       });
     }
 
-    // Return actual credentials (user is authenticated and viewing their own config)
+    // Check if OAuth token is still valid
+    const oauthConnected = config.adoAuthType === 'oauth' && 
+      config.adoOAuthAccessToken && 
+      config.adoOAuthTokenExpiresAt && 
+      new Date(config.adoOAuthTokenExpiresAt) > new Date();
+
+    // Return config with OAuth status (don't expose tokens directly)
     return NextResponse.json({
       ...config,
       notionToken: config.notionToken || '',
       adoPat: config.adoPat || '',
+      adoOAuthConnected: oauthConnected,
+      // Don't expose OAuth tokens to frontend
+      adoOAuthAccessToken: undefined,
+      adoOAuthRefreshToken: undefined,
     });
   } catch (error) {
     console.error('Error fetching config:', error);
@@ -79,11 +92,29 @@ export async function POST(request: NextRequest) {
     if (body.notionToken) {
       configData.notionToken = body.notionToken;
     }
-    if (body.adoPat) {
-      configData.adoPat = body.adoPat;
+    
+    // Handle ADO auth type
+    if (body.adoAuthType) {
+      configData.adoAuthType = body.adoAuthType;
     }
-    if (body.adoOrgUrl) {
-      configData.adoOrgUrl = body.adoOrgUrl;
+    
+    // Only update PAT credentials if using PAT auth
+    if (body.adoAuthType === 'pat' || !body.adoAuthType) {
+      if (body.adoPat) {
+        configData.adoPat = body.adoPat;
+      }
+      if (body.adoOrgUrl) {
+        configData.adoOrgUrl = body.adoOrgUrl;
+      }
+    }
+    
+    // If switching to PAT, clear OAuth tokens
+    if (body.adoAuthType === 'pat' && existingConfig?.adoAuthType === 'oauth') {
+      configData.adoOAuthAccessToken = null;
+      configData.adoOAuthRefreshToken = null;
+      configData.adoOAuthTokenExpiresAt = null;
+      configData.adoOAuthUserId = null;
+      configData.adoOAuthUserEmail = null;
     }
 
     let result;

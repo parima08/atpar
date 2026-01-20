@@ -1,5 +1,6 @@
 /**
  * Azure DevOps API client wrapper for Work Item operations
+ * Supports both PAT (Personal Access Token) and OAuth authentication
  */
 
 import * as azdev from 'azure-devops-node-api';
@@ -9,30 +10,87 @@ import type { JsonPatchOperation } from 'azure-devops-node-api/interfaces/common
 import type { WorkItem } from 'azure-devops-node-api/interfaces/WorkItemTrackingInterfaces';
 import type { AdoWorkItem, SyncConfig, AssigneeMapping, NotionFieldMap, AdoFieldInfo, AdoStateInfo } from './types';
 
+export type AdoAuthType = 'pat' | 'oauth';
+
+export interface AdoClientConfig {
+  orgUrl: string;
+  project: string;
+  syncConfig: SyncConfig;
+  authType: AdoAuthType;
+  pat?: string;
+  accessToken?: string;
+}
+
 export class AdoClient {
   private witApi: IWorkItemTrackingApi | null = null;
   private orgUrl: string;
-  private pat: string;
   private project: string;
   private config: SyncConfig;
+  private authType: AdoAuthType;
+  private pat?: string;
+  private accessToken?: string;
 
-  constructor(orgUrl: string, pat: string, project: string, config: SyncConfig) {
-    this.orgUrl = orgUrl;
-    this.pat = pat;
-    this.project = project;
-    this.config = config;
+  /**
+   * Create an ADO client with PAT authentication (legacy constructor)
+   */
+  constructor(orgUrl: string, pat: string, project: string, config: SyncConfig);
+  /**
+   * Create an ADO client with flexible authentication
+   */
+  constructor(config: AdoClientConfig);
+  constructor(
+    orgUrlOrConfig: string | AdoClientConfig,
+    pat?: string,
+    project?: string,
+    config?: SyncConfig
+  ) {
+    if (typeof orgUrlOrConfig === 'string') {
+      // Legacy constructor: (orgUrl, pat, project, config)
+      this.orgUrl = orgUrlOrConfig;
+      this.pat = pat;
+      this.project = project!;
+      this.config = config!;
+      this.authType = 'pat';
+    } else {
+      // New constructor: (AdoClientConfig)
+      this.orgUrl = orgUrlOrConfig.orgUrl;
+      this.project = orgUrlOrConfig.project;
+      this.config = orgUrlOrConfig.syncConfig;
+      this.authType = orgUrlOrConfig.authType;
+      this.pat = orgUrlOrConfig.pat;
+      this.accessToken = orgUrlOrConfig.accessToken;
+    }
   }
 
   /**
-   * Initialize the ADO connection
+   * Initialize the ADO connection based on auth type
    */
   private async getWitApi(): Promise<IWorkItemTrackingApi> {
     if (!this.witApi) {
-      const authHandler = azdev.getPersonalAccessTokenHandler(this.pat);
+      let authHandler;
+      
+      if (this.authType === 'oauth' && this.accessToken) {
+        // Use Bearer token handler for OAuth
+        authHandler = azdev.getBearerHandler(this.accessToken);
+      } else if (this.pat) {
+        // Use PAT handler
+        authHandler = azdev.getPersonalAccessTokenHandler(this.pat);
+      } else {
+        throw new Error('No valid authentication credentials provided');
+      }
+      
       const connection = new azdev.WebApi(this.orgUrl, authHandler);
       this.witApi = await connection.getWorkItemTrackingApi();
     }
     return this.witApi;
+  }
+  
+  /**
+   * Update the access token (useful after token refresh)
+   */
+  updateAccessToken(newToken: string): void {
+    this.accessToken = newToken;
+    this.witApi = null; // Clear cached API to force reconnection with new token
   }
 
   /**

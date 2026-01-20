@@ -4,5 +4,6 @@
 
 export * from './types';
 export { NotionClient } from './notion-client';
-export { AdoClient } from './ado-client';
+export { AdoClient, type AdoAuthType, type AdoClientConfig } from './ado-client';
 export { SyncService, type SyncDirection, type SyncItemDetail } from './sync-service';
+export { getValidAdoToken, refreshAdoToken } from './ado-oauth';

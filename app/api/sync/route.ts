@@ -3,7 +3,7 @@ import { db } from '@/lib/db/drizzle';
 import { syncConfigs, syncHistory } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import { getUser } from '@/lib/db/queries';
-import { NotionClient, AdoClient, SyncService, type SyncConfig, type SyncDirection } from '@/lib/sync';
+import { NotionClient, AdoClient, SyncService, type SyncConfig, type SyncDirection, getValidAdoToken } from '@/lib/sync';
 
 /**
  * POST /api/sync - Trigger a sync
@@ -36,8 +36,8 @@ export async function POST(request: NextRequest) {
 
     // Get credentials from database config
     const notionToken = dbConfig.notionToken;
-    const adoPat = dbConfig.adoPat;
     const adoOrgUrl = dbConfig.adoOrgUrl;
+    const adoAuthType = dbConfig.adoAuthType || 'pat';
 
     if (!notionToken) {
       return NextResponse.json(
@@ -45,12 +45,27 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
-    if (!adoPat) {
-      return NextResponse.json(
-        { error: 'ADO Personal Access Token not configured. Please add your ADO PAT in Sync > Config.' },
-        { status: 400 }
-      );
+
+    // Validate ADO credentials based on auth type
+    let adoAccessToken: string | null = null;
+    
+    if (adoAuthType === 'oauth') {
+      adoAccessToken = await getValidAdoToken(teamId);
+      if (!adoAccessToken) {
+        return NextResponse.json(
+          { error: 'Azure DevOps OAuth token expired or invalid. Please reconnect your ADO account.' },
+          { status: 400 }
+        );
+      }
+    } else {
+      if (!dbConfig.adoPat) {
+        return NextResponse.json(
+          { error: 'ADO Personal Access Token not configured. Please add your ADO PAT in Sync > Config.' },
+          { status: 400 }
+        );
+      }
     }
+
     if (!adoOrgUrl) {
       return NextResponse.json(
         { error: 'ADO Organization URL not configured. Please add your ADO org URL in Sync > Config.' },
@@ -107,12 +122,15 @@ export async function POST(request: NextRequest) {
         syncConfig
       );
 
-      const adoClient = new AdoClient(
-        adoOrgUrl,
-        adoPat,
-        dbConfig.adoProject,
-        syncConfig
-      );
+      // Initialize ADO client based on auth type
+      const adoClient = new AdoClient({
+        orgUrl: adoOrgUrl,
+        project: dbConfig.adoProject,
+        syncConfig,
+        authType: adoAuthType as 'pat' | 'oauth',
+        pat: dbConfig.adoPat || undefined,
+        accessToken: adoAccessToken || undefined,
+      });
 
       // Run sync
       const syncService = new SyncService(notionClient, adoClient, syncConfig);

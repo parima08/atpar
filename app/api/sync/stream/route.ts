@@ -3,7 +3,7 @@ import { db } from '@/lib/db/drizzle';
 import { syncConfigs, syncHistory } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import { getUser } from '@/lib/db/queries';
-import { NotionClient, AdoClient, type SyncConfig, type SyncDirection } from '@/lib/sync';
+import { NotionClient, AdoClient, type SyncConfig, type SyncDirection, getValidAdoToken } from '@/lib/sync';
 import type { NotionItem, AdoWorkItem } from '@/lib/sync/types';
 
 export interface StreamedSyncItem {
@@ -68,11 +68,37 @@ export async function POST(request: NextRequest) {
         }
 
         const notionToken = dbConfig.notionToken;
-        const adoPat = dbConfig.adoPat;
         const adoOrgUrl = dbConfig.adoOrgUrl;
+        const adoAuthType = dbConfig.adoAuthType || 'pat';
 
-        if (!notionToken || !adoPat || !adoOrgUrl) {
-          send({ type: 'error', error: 'Missing credentials. Please configure Notion and ADO settings.' });
+        if (!notionToken) {
+          send({ type: 'error', error: 'Missing Notion token. Please configure Notion settings.' });
+          controller.close();
+          return;
+        }
+
+        // Validate ADO credentials based on auth type
+        let adoAccessToken: string | null = null;
+        
+        if (adoAuthType === 'oauth') {
+          // Get valid OAuth token (will refresh if needed)
+          adoAccessToken = await getValidAdoToken(teamId);
+          if (!adoAccessToken) {
+            send({ type: 'error', error: 'Azure DevOps OAuth token expired or invalid. Please reconnect your ADO account.' });
+            controller.close();
+            return;
+          }
+        } else {
+          // PAT auth
+          if (!dbConfig.adoPat || !adoOrgUrl) {
+            send({ type: 'error', error: 'Missing ADO credentials. Please configure PAT and Organization URL.' });
+            controller.close();
+            return;
+          }
+        }
+
+        if (!adoOrgUrl) {
+          send({ type: 'error', error: 'Missing ADO Organization URL. Please configure your ADO settings.' });
           controller.close();
           return;
         }
@@ -112,7 +138,16 @@ export async function POST(request: NextRequest) {
 
         // Initialize clients
         const notionClient = new NotionClient(notionToken, notionDatabaseId, syncConfig);
-        const adoClient = new AdoClient(adoOrgUrl, adoPat, dbConfig.adoProject, syncConfig);
+        
+        // Initialize ADO client based on auth type
+        const adoClient = new AdoClient({
+          orgUrl: adoOrgUrl,
+          project: dbConfig.adoProject,
+          syncConfig,
+          authType: adoAuthType as 'pat' | 'oauth',
+          pat: dbConfig.adoPat || undefined,
+          accessToken: adoAccessToken || undefined,
+        });
 
         // Track results
         const result = {
