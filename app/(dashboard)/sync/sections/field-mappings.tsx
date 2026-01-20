@@ -29,7 +29,7 @@ interface AdoState {
   category: string;
 }
 
-export default function MappingsPage() {
+export function FieldMappingsSection() {
   const [config, setConfig] = useState<Config>({
     statusMapping: {},
     reverseStatusMapping: {},
@@ -44,12 +44,10 @@ export default function MappingsPage() {
   const [databaseId, setDatabaseId] = useState('');
   const [project, setProject] = useState('');
 
-  // Load config on mount
   useEffect(() => {
     loadConfig();
   }, []);
 
-  // Load fields when database/project change
   useEffect(() => {
     if (databaseId) {
       loadNotionFields();
@@ -76,7 +74,6 @@ export default function MappingsPage() {
         setDatabaseId(data.notionDatabaseId || '');
         setProject(data.adoProject || '');
         
-        // Convert status mapping to array format
         const mappings: StatusMapping[] = Object.entries(data.statusMapping || {}).map(
           ([notionStatus, adoState]) => ({
             notionStatus,
@@ -132,14 +129,12 @@ export default function MappingsPage() {
     setIsSaving(true);
     setSaveSuccess(false);
 
-    // Convert array format to object format
     const statusMapping: Record<string, string> = {};
     const reverseStatusMapping: Record<string, string> = {};
 
     statusMappings.forEach(({ notionStatus, adoState }) => {
       if (notionStatus && adoState) {
         statusMapping[notionStatus] = adoState;
-        // Only add to reverse if not already present (first wins)
         if (!reverseStatusMapping[adoState]) {
           reverseStatusMapping[adoState] = notionStatus;
         }
@@ -168,7 +163,6 @@ export default function MappingsPage() {
     }
   };
 
-  // Get status options from Notion fields
   const notionStatusOptions = notionFields
     .filter((f) => f.type === 'status' || f.type === 'select')
     .flatMap((f) => f.options || [])
@@ -176,11 +170,6 @@ export default function MappingsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Field Mappings</h1>
-        <p className="text-gray-500">Map Notion statuses to Azure DevOps states</p>
-      </div>
-
       {/* Status Mapping */}
       <Card>
         <CardHeader>
@@ -270,7 +259,7 @@ export default function MappingsPage() {
         </CardContent>
       </Card>
 
-      {/* Assignee Mapping (simplified) */}
+      {/* Assignee Mapping */}
       <Card>
         <CardHeader>
           <CardTitle>Assignee Mapping (Optional)</CardTitle>
@@ -291,7 +280,7 @@ export default function MappingsPage() {
         </CardContent>
       </Card>
 
-      {/* Current Reverse Mapping Preview */}
+      {/* Reverse Mapping Preview */}
       <Card>
         <CardHeader>
           <CardTitle>Reverse Mapping Preview</CardTitle>
@@ -316,6 +305,9 @@ export default function MappingsPage() {
                   <span>{notionStatus}</span>
                 </div>
               ))}
+              {statusMappings.every(m => !m.notionStatus || !m.adoState) && (
+                <p className="text-gray-500 text-sm">No mappings defined yet</p>
+              )}
             </div>
           </div>
         </CardContent>
@@ -323,7 +315,7 @@ export default function MappingsPage() {
 
       {/* Save Button */}
       <div className="flex items-center gap-4">
-        <Button onClick={saveConfig} disabled={isSaving}>
+        <Button onClick={saveConfig} disabled={isSaving} className="bg-[#0D7377] hover:bg-[#0A5A5C]">
           {isSaving ? (
             <Loader2 className="h-4 w-4 mr-2 animate-spin" />
           ) : (

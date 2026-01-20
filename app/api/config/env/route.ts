@@ -1,8 +1,11 @@
 import { NextResponse } from 'next/server';
 import { getUser } from '@/lib/db/queries';
+import { db } from '@/lib/db/drizzle';
+import { syncConfigs } from '@/lib/db/schema';
+import { eq } from 'drizzle-orm';
 
 /**
- * GET /api/config/env - Check which environment variables are set (not their values)
+ * GET /api/config/env - Check which credentials are configured (from database)
  */
 export async function GET() {
   try {
@@ -11,17 +14,24 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const teamId = 1; // For simplicity
+
+    // Check credentials from database config
+    const config = await db.query.syncConfigs.findFirst({
+      where: eq(syncConfigs.teamId, teamId),
+    });
+
     return NextResponse.json({
-      notionToken: !!process.env.NOTION_TOKEN,
-      adoPat: !!process.env.ADO_PAT,
-      adoOrgUrl: !!process.env.ADO_ORG_URL,
+      notionToken: !!config?.notionToken,
+      adoPat: !!config?.adoPat,
+      adoOrgUrl: !!config?.adoOrgUrl,
       // Return the org URL (not secret) for display
-      adoOrgUrlValue: process.env.ADO_ORG_URL || '',
+      adoOrgUrlValue: config?.adoOrgUrl || '',
     });
   } catch (error) {
-    console.error('Error checking env:', error);
+    console.error('Error checking config:', error);
     return NextResponse.json(
-      { error: 'Failed to check environment' },
+      { error: 'Failed to check configuration' },
       { status: 500 }
     );
   }

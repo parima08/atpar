@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Client } from '@notionhq/client';
 import { getUser } from '@/lib/db/queries';
+import { db } from '@/lib/db/drizzle';
+import { syncConfigs } from '@/lib/db/schema';
+import { eq } from 'drizzle-orm';
 
 interface PropertyOption {
   name: string;
@@ -32,10 +35,15 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const notionToken = process.env.NOTION_TOKEN;
+    const teamId = 1; // For simplicity
+    const config = await db.query.syncConfigs.findFirst({
+      where: eq(syncConfigs.teamId, teamId),
+    });
+
+    const notionToken = config?.notionToken;
     if (!notionToken) {
       return NextResponse.json(
-        { error: 'NOTION_TOKEN not configured' },
+        { error: 'Notion token not configured. Please add your token in Sync > Config.' },
         { status: 400 }
       );
     }

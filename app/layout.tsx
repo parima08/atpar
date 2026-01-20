@@ -34,8 +34,9 @@ export default function RootLayout({
     <html
       lang="en"
       className={`${dmSans.variable} ${fraunces.variable}`}
+      suppressHydrationWarning
     >
-      <body className="min-h-[100dvh] bg-[#FAFAF7] font-sans text-[#1C1917] antialiased">
+      <body className="min-h-[100dvh] bg-[#FAFAF7] font-sans text-[#1C1917] antialiased" suppressHydrationWarning>
         <SWRConfig
           value={{
             fallback: {

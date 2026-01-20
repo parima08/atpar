@@ -26,7 +26,11 @@ interface Config {
   notionDatabaseIds: string[];
 }
 
-export default function ConfigPage() {
+interface ConfigurationSectionProps {
+  onSaveSuccess?: () => void;
+}
+
+export function ConfigurationSection({ onSaveSuccess }: ConfigurationSectionProps) {
   const [notionConnected, setNotionConnected] = useState<boolean | null>(null);
   const [adoConnected, setAdoConnected] = useState<boolean | null>(null);
   const [notionDatabases, setNotionDatabases] = useState<NotionDatabase[]>([]);
@@ -48,10 +52,8 @@ export default function ConfigPage() {
   const [showAdoPat, setShowAdoPat] = useState(false);
   const [showNotionToken, setShowNotionToken] = useState(false);
   
-  // Track if we've already loaded databases for the current token
   const lastLoadedTokenRef = useRef<string>('');
 
-  // Load initial data
   useEffect(() => {
     loadConfig();
   }, []);
@@ -61,7 +63,6 @@ export default function ConfigPage() {
       const response = await fetch('/api/config');
       if (response.ok) {
         const data = await response.json();
-        // Pad notionDatabaseIds to always have 5 slots
         const databaseIds = data.notionDatabaseIds || [];
         while (databaseIds.length < 5) {
           databaseIds.push('');
@@ -74,7 +75,6 @@ export default function ConfigPage() {
           notionDatabaseIds: databaseIds,
         });
         
-        // If there's a saved token, try to load databases
         if (data.notionToken && data.notionToken.length > 20) {
           loadNotionDatabases(data.notionToken);
         }
@@ -87,7 +87,6 @@ export default function ConfigPage() {
   const loadNotionDatabases = useCallback(async (token?: string) => {
     const tokenToUse = token || config.notionToken;
     
-    // Don't reload if we already loaded for this token
     if (!tokenToUse || tokenToUse.length < 20) return;
     if (tokenToUse === lastLoadedTokenRef.current && notionDatabases.length > 0) return;
     
@@ -124,12 +123,10 @@ export default function ConfigPage() {
     }
   }, [config.notionToken, notionDatabases.length]);
 
-  // Auto-load databases when token changes (with debounce)
   useEffect(() => {
     const token = config.notionToken;
     if (!token || token.length < 20) return;
     
-    // Debounce the auto-load
     const timer = setTimeout(() => {
       loadNotionDatabases(token);
     }, 500);
@@ -168,7 +165,6 @@ export default function ConfigPage() {
     setIsSaving(true);
     setSaveSuccess(false);
     try {
-      // Filter out empty database IDs for storage
       const filteredDatabaseIds = config.notionDatabaseIds.filter(id => id.trim() !== '');
       
       const response = await fetch('/api/config', {
@@ -181,6 +177,7 @@ export default function ConfigPage() {
       });
       if (response.ok) {
         setSaveSuccess(true);
+        onSaveSuccess?.();
         setTimeout(() => setSaveSuccess(false), 3000);
       }
     } catch (error) {
@@ -196,7 +193,6 @@ export default function ConfigPage() {
     setConfig({ ...config, notionDatabaseIds: newIds });
   };
 
-  // Convert databases to combobox options (showing names, storing IDs)
   const databaseOptions: ComboboxOption[] = notionDatabases.map(db => ({
     value: db.id,
     label: db.title,
@@ -213,11 +209,6 @@ export default function ConfigPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Sync Configuration</h1>
-        <p className="text-gray-500">Configure your Azure DevOps and Notion connections</p>
-      </div>
-
       {/* Two-column layout */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Left Column: Azure DevOps */}
@@ -362,11 +353,10 @@ export default function ConfigPage() {
                 </button>
               </div>
               
-              {/* Collapsible instructions */}
               <button
                 type="button"
                 onClick={() => setShowInstructions(!showInstructions)}
-                className="text-xs text-blue-600 hover:text-blue-800 mt-1 flex items-center gap-1"
+                className="text-xs text-[#0D7377] hover:text-[#0A5A5C] mt-1 flex items-center gap-1"
               >
                 {showInstructions ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
                 How to get a Notion token
@@ -376,7 +366,7 @@ export default function ConfigPage() {
                 <div className="mt-2 p-3 bg-gray-50 rounded-md text-xs space-y-2">
                   <p className="font-medium">To create a Notion integration:</p>
                   <ol className="list-decimal list-inside space-y-1 text-gray-600">
-                    <li>Go to <a href="https://www.notion.so/my-integrations" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline inline-flex items-center gap-1">notion.so/my-integrations <ExternalLink className="h-3 w-3" /></a></li>
+                    <li>Go to <a href="https://www.notion.so/my-integrations" target="_blank" rel="noopener noreferrer" className="text-[#0D7377] hover:underline inline-flex items-center gap-1">notion.so/my-integrations <ExternalLink className="h-3 w-3" /></a></li>
                     <li>Click &quot;New integration&quot;</li>
                     <li>Give it a name and select the workspace</li>
                     <li>Copy the &quot;Internal Integration Token&quot;</li>
@@ -392,7 +382,7 @@ export default function ConfigPage() {
               </p>
             )}
 
-            {/* Database selections with autocomplete or manual input */}
+            {/* Database selections */}
             <div className="space-y-3 pt-2">
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Database className="h-4 w-4" />
@@ -403,7 +393,6 @@ export default function ConfigPage() {
                 </span>
               </div>
               
-              {/* Show manual input hint when no databases found but connected */}
               {notionConnected && notionDatabases.length === 0 && (
                 <p className="text-xs text-amber-600 bg-amber-50 p-2 rounded-md">
                   No shared databases found. You can manually enter database IDs below. 
@@ -447,7 +436,7 @@ export default function ConfigPage() {
 
       {/* Save Button */}
       <div className="flex items-center gap-4">
-        <Button onClick={saveConfig} disabled={isSaving} size="lg">
+        <Button onClick={saveConfig} disabled={isSaving} size="lg" className="bg-[#0D7377] hover:bg-[#0A5A5C]">
           {isSaving ? (
             <Loader2 className="h-4 w-4 mr-2 animate-spin" />
           ) : (

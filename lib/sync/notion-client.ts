@@ -5,7 +5,7 @@
 import { Client } from '@notionhq/client';
 import type {
   PageObjectResponse,
-  QueryDatabaseResponse,
+  QueryDataSourceResponse,
   DatabaseObjectResponse,
 } from '@notionhq/client/build/src/api-endpoints';
 import type { NotionItem, SyncConfig, NotionFieldMap, SubtaskInfo, NotionPropertyInfo } from './types';
@@ -101,8 +101,8 @@ export class NotionClient {
     let cursor: string | undefined = undefined;
 
     do {
-      const response: QueryDatabaseResponse = await this.client.databases.query({
-        database_id: this.databaseId,
+      const response: QueryDataSourceResponse = await this.client.dataSources.query({
+        data_source_id: this.databaseId,
         start_cursor: cursor,
         page_size: 100,
       });

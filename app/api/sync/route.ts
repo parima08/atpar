@@ -22,29 +22,49 @@ export async function POST(request: NextRequest) {
 
     const teamId = 1; // For simplicity
 
-    // Check environment variables
-    const notionToken = process.env.NOTION_TOKEN;
-    const adoPat = process.env.ADO_PAT;
-    const adoOrgUrl = process.env.ADO_ORG_URL;
-
-    if (!notionToken) {
-      return NextResponse.json({ error: 'NOTION_TOKEN not configured' }, { status: 400 });
-    }
-    if (!adoPat) {
-      return NextResponse.json({ error: 'ADO_PAT not configured' }, { status: 400 });
-    }
-    if (!adoOrgUrl) {
-      return NextResponse.json({ error: 'ADO_ORG_URL not configured' }, { status: 400 });
-    }
-
-    // Get sync config from database
+    // Get sync config from database (credentials are stored per-team)
     const dbConfig = await db.query.syncConfigs.findFirst({
       where: eq(syncConfigs.teamId, teamId),
     });
 
-    if (!dbConfig || !dbConfig.notionDatabaseId || !dbConfig.adoProject) {
+    if (!dbConfig) {
       return NextResponse.json(
-        { error: 'Sync configuration incomplete. Please configure Notion database and ADO project.' },
+        { error: 'Sync configuration not found. Please configure your sync settings first.' },
+        { status: 400 }
+      );
+    }
+
+    // Get credentials from database config
+    const notionToken = dbConfig.notionToken;
+    const adoPat = dbConfig.adoPat;
+    const adoOrgUrl = dbConfig.adoOrgUrl;
+
+    if (!notionToken) {
+      return NextResponse.json(
+        { error: 'Notion token not configured. Please add your Notion integration token in Sync > Config.' },
+        { status: 400 }
+      );
+    }
+    if (!adoPat) {
+      return NextResponse.json(
+        { error: 'ADO Personal Access Token not configured. Please add your ADO PAT in Sync > Config.' },
+        { status: 400 }
+      );
+    }
+    if (!adoOrgUrl) {
+      return NextResponse.json(
+        { error: 'ADO Organization URL not configured. Please add your ADO org URL in Sync > Config.' },
+        { status: 400 }
+      );
+    }
+
+    // Get the first database ID for syncing (or use them all based on your needs)
+    const notionDatabaseIds = (dbConfig.notionDatabaseIds as string[]) || [];
+    const notionDatabaseId = notionDatabaseIds[0];
+
+    if (!notionDatabaseId || !dbConfig.adoProject) {
+      return NextResponse.json(
+        { error: 'Sync configuration incomplete. Please configure Notion database and ADO project in Sync > Config.' },
         { status: 400 }
       );
     }
@@ -83,7 +103,7 @@ export async function POST(request: NextRequest) {
       // Initialize clients
       const notionClient = new NotionClient(
         notionToken,
-        dbConfig.notionDatabaseId,
+        notionDatabaseId,
         syncConfig
       );
 
