@@ -1,5 +1,7 @@
 'use client';
 
+import * as React from 'react';
+import dynamic from 'next/dynamic';
 import { RefreshCcw, Settings, LogOut, ChevronRight, Play, Wrench, ArrowLeftRight, History, Users, Shield, Activity, Settings2 } from 'lucide-react';
 import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -85,10 +87,32 @@ function isSyncSubItem(item: SyncSubItem | DashboardSubItem): item is SyncSubIte
   return 'id' in item;
 }
 
-export function AppSidebar() {
+function AppSidebarInner() {
   const pathname = usePathname();
   const router = useRouter();
   const { data: user } = useSWR<User>('/api/user', fetcher);
+  
+  // Initialize open state for collapsibles based on current path
+  const [openItems, setOpenItems] = React.useState<Record<string, boolean>>(() => {
+    const initial: Record<string, boolean> = {};
+    navItems.forEach((item) => {
+      const isActive = pathname === item.href || 
+        (item.href !== '/' && pathname.startsWith(item.href));
+      initial[item.href] = isActive;
+    });
+    return initial;
+  });
+
+  // Update open items when pathname changes
+  React.useEffect(() => {
+    const newOpenItems: Record<string, boolean> = {};
+    navItems.forEach((item) => {
+      const isActive = pathname === item.href || 
+        (item.href !== '/' && pathname.startsWith(item.href));
+      newOpenItems[item.href] = isActive;
+    });
+    setOpenItems(newOpenItems);
+  }, [pathname]);
 
   async function handleSignOut() {
     await signOut();
@@ -137,11 +161,13 @@ export function AppSidebar() {
               {navItems.map((item) => {
                 const isActive = pathname === item.href || 
                   (item.href !== '/' && pathname.startsWith(item.href));
+                const isOpen = openItems[item.href] ?? false;
                 
                 return (
                   <Collapsible
                     key={item.href}
-                    defaultOpen={isActive}
+                    open={isOpen}
+                    onOpenChange={(open) => setOpenItems(prev => ({ ...prev, [item.href]: open }))}
                     className="group/collapsible"
                   >
                     <SidebarMenuItem>
@@ -246,3 +272,42 @@ export function AppSidebar() {
     </Sidebar>
   );
 }
+
+// Skeleton component for loading state
+function AppSidebarSkeleton() {
+  return (
+    <div className="flex h-full w-64 flex-col border-r border-sidebar-border bg-sidebar">
+      <div className="px-4 py-5">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded bg-gray-200 animate-pulse" />
+          <div className="w-16 h-6 rounded bg-gray-200 animate-pulse" />
+        </div>
+      </div>
+      <div className="mx-2 h-px bg-sidebar-border" />
+      <div className="flex-1 px-2 py-4 space-y-2">
+        <div className="h-11 rounded-md bg-gray-100 animate-pulse" />
+        <div className="h-11 rounded-md bg-gray-100 animate-pulse" />
+      </div>
+      <div className="p-3 mt-auto">
+        <div className="h-px bg-sidebar-border mb-3" />
+        <div className="flex items-center gap-3 p-2">
+          <div className="w-9 h-9 rounded-full bg-gray-200 animate-pulse" />
+          <div className="flex-1 space-y-1">
+            <div className="h-4 w-20 rounded bg-gray-200 animate-pulse" />
+            <div className="h-3 w-32 rounded bg-gray-200 animate-pulse" />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Export a dynamically imported version that skips SSR to avoid hydration mismatches
+// caused by Radix UI's useId generating different IDs on server vs client
+export const AppSidebar = dynamic(
+  () => Promise.resolve(AppSidebarInner),
+  { 
+    ssr: false,
+    loading: () => <AppSidebarSkeleton />
+  }
+);

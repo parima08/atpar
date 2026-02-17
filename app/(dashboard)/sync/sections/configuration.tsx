@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Combobox, ComboboxOption } from '@/components/ui/combobox';
-import { CheckCircle, XCircle, Loader2, Save, RefreshCcw, ExternalLink, ChevronDown, ChevronUp, Database, Eye, EyeOff, Link2, Unlink, Key } from 'lucide-react';
+import { CheckCircle, XCircle, Loader2, Save, RefreshCcw, ExternalLink, ChevronDown, ChevronUp, Database, Eye, EyeOff, Link2, Unlink, Key, Building2, FolderKanban, Layers, FileType, Clock, CalendarClock, Hand } from 'lucide-react';
 
 interface NotionDatabase {
   id: string;
@@ -16,6 +16,25 @@ interface NotionDatabase {
 interface AdoProject {
   id: string;
   name: string;
+  description?: string;
+}
+
+interface AdoOrganization {
+  id: string;
+  name: string;
+  url: string;
+}
+
+interface AdoArea {
+  id: number;
+  path: string;
+  name: string;
+}
+
+interface AdoWorkItemType {
+  name: string;
+  description?: string;
+  color?: string;
 }
 
 interface Config {
@@ -24,9 +43,15 @@ interface Config {
   adoPat: string;
   adoOrgUrl: string;
   adoProject: string;
+  adoAreaPath: string;
+  adoWorkType: string;
   notionDatabaseIds: string[];
   adoOAuthConnected: boolean;
   adoOAuthUserEmail: string | null;
+  userHasAdoTokens: boolean;
+  syncSchedule: 'manual' | 'hourly' | 'daily';
+  syncScheduleHour: number;
+  syncScheduleMinute: number;
 }
 
 interface ConfigurationSectionProps {
@@ -38,15 +63,28 @@ export function ConfigurationSection({ onSaveSuccess }: ConfigurationSectionProp
   const [adoConnected, setAdoConnected] = useState<boolean | null>(null);
   const [notionDatabases, setNotionDatabases] = useState<NotionDatabase[]>([]);
   const [adoProjects, setAdoProjects] = useState<AdoProject[]>([]);
+  const [adoOrganizations, setAdoOrganizations] = useState<AdoOrganization[]>([]);
+  const [adoAreas, setAdoAreas] = useState<AdoArea[]>([]);
+  const [adoWorkItemTypes, setAdoWorkItemTypes] = useState<AdoWorkItemType[]>([]);
+  const [loadingOrgs, setLoadingOrgs] = useState(false);
+  const [loadingProjects, setLoadingProjects] = useState(false);
+  const [loadingAreas, setLoadingAreas] = useState(false);
+  const [loadingWorkTypes, setLoadingWorkTypes] = useState(false);
   const [config, setConfig] = useState<Config>({
     notionToken: '',
     adoAuthType: 'oauth',
     adoPat: '',
     adoOrgUrl: '',
     adoProject: '',
+    adoAreaPath: '',
+    adoWorkType: '',
     notionDatabaseIds: ['', '', '', '', ''],
     adoOAuthConnected: false,
     adoOAuthUserEmail: null,
+    userHasAdoTokens: false,
+    syncSchedule: 'manual',
+    syncScheduleHour: 8,
+    syncScheduleMinute: 0,
   });
   const [disconnectingOAuth, setDisconnectingOAuth] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -76,19 +114,27 @@ export function ConfigurationSection({ onSaveSuccess }: ConfigurationSectionProp
         }
         setConfig({
           notionToken: data.notionToken || '',
-          adoAuthType: data.adoAuthType || 'pat',
+          adoAuthType: data.adoAuthType || 'oauth',
           adoPat: data.adoPat || '',
           adoOrgUrl: data.adoOrgUrl || '',
           adoProject: data.adoProject || '',
+          adoAreaPath: data.adoAreaPath || '',
+          adoWorkType: data.adoWorkType || '',
           notionDatabaseIds: databaseIds,
           adoOAuthConnected: data.adoOAuthConnected || false,
           adoOAuthUserEmail: data.adoOAuthUserEmail || null,
+          userHasAdoTokens: data.userHasAdoTokens || false,
+          syncSchedule: data.syncSchedule || 'manual',
+          syncScheduleHour: typeof data.syncScheduleHour === 'number' ? data.syncScheduleHour : 8,
+          syncScheduleMinute: typeof data.syncScheduleMinute === 'number' ? data.syncScheduleMinute : 0,
         });
         
         // Set ADO connected status for OAuth
-        if (data.adoOAuthConnected) {
+        if (data.adoOAuthConnected || data.userHasAdoTokens) {
           setAdoConnected(true);
           setAdoMessage(`Connected as ${data.adoOAuthUserEmail || 'Azure DevOps user'}`);
+          // Auto-load organizations if user has ADO tokens
+          loadAdoOrganizations();
         }
         
         if (data.notionToken && data.notionToken.length > 20) {
@@ -99,6 +145,120 @@ export function ConfigurationSection({ onSaveSuccess }: ConfigurationSectionProp
       console.error('Failed to load config:', error);
     }
   };
+
+  // Load ADO organizations from user's OAuth tokens
+  const loadAdoOrganizations = async () => {
+    setLoadingOrgs(true);
+    try {
+      const response = await fetch('/api/ado/organizations');
+      if (response.ok) {
+        const data = await response.json();
+        setAdoOrganizations(data.organizations || []);
+        setAdoConnected(true);
+      } else if (response.status === 401) {
+        // User needs to reconnect
+        setAdoMessage('Please sign in with Microsoft to connect Azure DevOps');
+      }
+    } catch (error) {
+      console.error('Failed to load ADO organizations:', error);
+    } finally {
+      setLoadingOrgs(false);
+    }
+  };
+
+  // Load ADO projects for selected organization
+  const loadAdoProjects = async (orgName: string) => {
+    if (!orgName) return;
+    setLoadingProjects(true);
+    setAdoProjects([]);
+    setAdoAreas([]);
+    setAdoWorkItemTypes([]);
+    try {
+      const response = await fetch(`/api/ado/projects?org=${encodeURIComponent(orgName)}`);
+      if (response.ok) {
+        const data = await response.json();
+        setAdoProjects(data.projects || []);
+      }
+    } catch (error) {
+      console.error('Failed to load ADO projects:', error);
+    } finally {
+      setLoadingProjects(false);
+    }
+  };
+
+  // Load ADO area paths for selected project
+  const loadAdoAreas = async (orgName: string, projectName: string) => {
+    if (!orgName || !projectName) return;
+    setLoadingAreas(true);
+    try {
+      const response = await fetch(`/api/ado/areas?org=${encodeURIComponent(orgName)}&project=${encodeURIComponent(projectName)}`);
+      if (response.ok) {
+        const data = await response.json();
+        setAdoAreas(data.areas || []);
+      }
+    } catch (error) {
+      console.error('Failed to load ADO areas:', error);
+    } finally {
+      setLoadingAreas(false);
+    }
+  };
+
+  // Load ADO work item types for selected project
+  const loadAdoWorkItemTypes = async (orgName: string, projectName: string) => {
+    if (!orgName || !projectName) return;
+    setLoadingWorkTypes(true);
+    try {
+      const response = await fetch(`/api/ado/work-item-types?org=${encodeURIComponent(orgName)}&project=${encodeURIComponent(projectName)}`);
+      if (response.ok) {
+        const data = await response.json();
+        setAdoWorkItemTypes(data.workItemTypes || []);
+      }
+    } catch (error) {
+      console.error('Failed to load ADO work item types:', error);
+    } finally {
+      setLoadingWorkTypes(false);
+    }
+  };
+
+  // Handle organization selection
+  const handleOrgChange = (orgUrl: string) => {
+    setConfig({ ...config, adoOrgUrl: orgUrl, adoProject: '', adoAreaPath: '', adoWorkType: '' });
+    const orgName = orgUrl.replace('https://dev.azure.com/', '');
+    if (orgName) {
+      loadAdoProjects(orgName);
+    }
+  };
+
+  // Handle project selection
+  const handleProjectChange = (projectName: string) => {
+    setConfig({ ...config, adoProject: projectName, adoAreaPath: '', adoWorkType: '' });
+    const orgName = config.adoOrgUrl.replace('https://dev.azure.com/', '');
+    if (orgName && projectName) {
+      loadAdoAreas(orgName, projectName);
+      loadAdoWorkItemTypes(orgName, projectName);
+    }
+  };
+
+  // Effect to load projects when org URL is set (from saved config)
+  useEffect(() => {
+    if (config.adoOrgUrl && adoOrganizations.length > 0 && adoProjects.length === 0) {
+      const orgName = config.adoOrgUrl.replace('https://dev.azure.com/', '');
+      if (orgName) {
+        loadAdoProjects(orgName);
+      }
+    }
+  }, [config.adoOrgUrl, adoOrganizations.length, adoProjects.length]);
+
+  // Effect to load areas and work types when project is set (from saved config)
+  useEffect(() => {
+    if (config.adoOrgUrl && config.adoProject && adoProjects.length > 0 && adoAreas.length === 0) {
+      const orgName = config.adoOrgUrl.replace('https://dev.azure.com/', '');
+      if (orgName) {
+        loadAdoAreas(orgName, config.adoProject);
+        loadAdoWorkItemTypes(orgName, config.adoProject);
+      }
+    }
+  }, [config.adoOrgUrl, config.adoProject, adoProjects.length, adoAreas.length]);
 
   const loadNotionDatabases = useCallback(async (token?: string) => {
     const tokenToUse = token || config.notionToken;
@@ -189,7 +349,12 @@ export function ConfigurationSection({ onSaveSuccess }: ConfigurationSectionProp
         adoAuthType: config.adoAuthType,
         adoProject: config.adoProject,
         adoOrgUrl: config.adoOrgUrl,
+        adoAreaPath: config.adoAreaPath,
+        adoWorkType: config.adoWorkType,
         notionDatabaseIds: filteredDatabaseIds,
+        syncSchedule: config.syncSchedule,
+        syncScheduleHour: config.syncScheduleHour,
+        syncScheduleMinute: config.syncScheduleMinute,
       };
       
       // Only include PAT if using PAT auth
@@ -410,48 +575,193 @@ export function ConfigurationSection({ onSaveSuccess }: ConfigurationSectionProp
               </>
             )}
 
-            {/* Organization URL for OAuth (shown after connected) */}
-            {config.adoAuthType === 'oauth' && config.adoOAuthConnected && (
-              <div>
-                <Label htmlFor="adoOrgUrl">Organization URL</Label>
-                <Input
-                  id="adoOrgUrl"
-                  placeholder="https://dev.azure.com/your-org"
-                  value={config.adoOrgUrl}
-                  onChange={(e) => setConfig({ ...config, adoOrgUrl: e.target.value })}
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  e.g., https://dev.azure.com/mycompany
-                </p>
+            {/* Dynamic ADO Selection - for OAuth/Microsoft login users */}
+            {(config.adoAuthType === 'oauth' || config.userHasAdoTokens) && (config.adoOAuthConnected || config.userHasAdoTokens) && (
+              <div className="space-y-4 pt-2">
+                {/* Organization Selection */}
+                <div>
+                  <Label htmlFor="adoOrg" className="flex items-center gap-2">
+                    <Building2 className="h-4 w-4" />
+                    Organization
+                  </Label>
+                  {loadingOrgs ? (
+                    <div className="flex items-center gap-2 mt-1 text-sm text-gray-500">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Loading organizations...
+                    </div>
+                  ) : adoOrganizations.length > 0 ? (
+                    <select
+                      id="adoOrg"
+                      value={config.adoOrgUrl}
+                      onChange={(e) => handleOrgChange(e.target.value)}
+                      className="w-full mt-1 p-2 border rounded-md bg-white text-sm"
+                    >
+                      <option value="">Select an organization...</option>
+                      {adoOrganizations.map((org) => (
+                        <option key={org.id} value={org.url}>
+                          {org.name}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <div className="mt-1">
+                      <Input
+                        id="adoOrgUrl"
+                        placeholder="https://dev.azure.com/your-org"
+                        value={config.adoOrgUrl}
+                        onChange={(e) => handleOrgChange(e.target.value)}
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        No organizations found. Enter URL manually.
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Project Selection */}
+                {config.adoOrgUrl && (
+                  <div>
+                    <Label htmlFor="adoProject" className="flex items-center gap-2">
+                      <FolderKanban className="h-4 w-4" />
+                      Project
+                    </Label>
+                    {loadingProjects ? (
+                      <div className="flex items-center gap-2 mt-1 text-sm text-gray-500">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Loading projects...
+                      </div>
+                    ) : adoProjects.length > 0 ? (
+                      <select
+                        id="adoProject"
+                        value={config.adoProject}
+                        onChange={(e) => handleProjectChange(e.target.value)}
+                        className="w-full mt-1 p-2 border rounded-md bg-white text-sm"
+                      >
+                        <option value="">Select a project...</option>
+                        {adoProjects.map((p) => (
+                          <option key={p.id} value={p.name}>
+                            {p.name}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <Input
+                        id="adoProject"
+                        placeholder="Project name"
+                        value={config.adoProject}
+                        onChange={(e) => handleProjectChange(e.target.value)}
+                        className="mt-1"
+                      />
+                    )}
+                  </div>
+                )}
+
+                {/* Area Path Selection */}
+                {config.adoProject && (
+                  <div>
+                    <Label htmlFor="adoAreaPath" className="flex items-center gap-2">
+                      <Layers className="h-4 w-4" />
+                      Area Path
+                    </Label>
+                    {loadingAreas ? (
+                      <div className="flex items-center gap-2 mt-1 text-sm text-gray-500">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Loading area paths...
+                      </div>
+                    ) : adoAreas.length > 0 ? (
+                      <select
+                        id="adoAreaPath"
+                        value={config.adoAreaPath}
+                        onChange={(e) => setConfig({ ...config, adoAreaPath: e.target.value })}
+                        className="w-full mt-1 p-2 border rounded-md bg-white text-sm"
+                      >
+                        <option value="">Select an area path...</option>
+                        {adoAreas.map((area) => (
+                          <option key={area.id} value={area.path}>
+                            {area.path}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <Input
+                        id="adoAreaPath"
+                        placeholder="Area path (e.g., Project\Team)"
+                        value={config.adoAreaPath}
+                        onChange={(e) => setConfig({ ...config, adoAreaPath: e.target.value })}
+                        className="mt-1"
+                      />
+                    )}
+                  </div>
+                )}
+
+                {/* Work Item Type Selection */}
+                {config.adoProject && (
+                  <div>
+                    <Label htmlFor="adoWorkType" className="flex items-center gap-2">
+                      <FileType className="h-4 w-4" />
+                      Work Item Type
+                    </Label>
+                    {loadingWorkTypes ? (
+                      <div className="flex items-center gap-2 mt-1 text-sm text-gray-500">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Loading work item types...
+                      </div>
+                    ) : adoWorkItemTypes.length > 0 ? (
+                      <select
+                        id="adoWorkType"
+                        value={config.adoWorkType}
+                        onChange={(e) => setConfig({ ...config, adoWorkType: e.target.value })}
+                        className="w-full mt-1 p-2 border rounded-md bg-white text-sm"
+                      >
+                        <option value="">Select a work item type...</option>
+                        {adoWorkItemTypes.map((type) => (
+                          <option key={type.name} value={type.name}>
+                            {type.name}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <Input
+                        id="adoWorkType"
+                        placeholder="Work item type (e.g., User Story, Bug)"
+                        value={config.adoWorkType}
+                        onChange={(e) => setConfig({ ...config, adoWorkType: e.target.value })}
+                        className="mt-1"
+                      />
+                    )}
+                  </div>
+                )}
               </div>
             )}
 
-            {/* Project Selection - shown for both auth types */}
-            <div>
-              <Label htmlFor="adoProject">Project Name</Label>
-              {adoProjects.length > 0 ? (
-                <select
-                  id="adoProject"
-                  value={config.adoProject}
-                  onChange={(e) => setConfig({ ...config, adoProject: e.target.value })}
-                  className="w-full mt-1 p-2 border rounded-md bg-white"
-                >
-                  <option value="">Select a project...</option>
-                  {adoProjects.map((p) => (
-                    <option key={p.id} value={p.name}>
-                      {p.name}
-                    </option>
-                  ))}
-                </select>
-              ) : (
-                <Input
-                  id="adoProject"
-                  placeholder="Project name"
-                  value={config.adoProject}
-                  onChange={(e) => setConfig({ ...config, adoProject: e.target.value })}
-                />
-              )}
-            </div>
+            {/* Manual Project Entry - for PAT auth only */}
+            {config.adoAuthType === 'pat' && (
+              <div>
+                <Label htmlFor="adoProject">Project Name</Label>
+                {adoProjects.length > 0 ? (
+                  <select
+                    id="adoProject"
+                    value={config.adoProject}
+                    onChange={(e) => setConfig({ ...config, adoProject: e.target.value })}
+                    className="w-full mt-1 p-2 border rounded-md bg-white"
+                  >
+                    <option value="">Select a project...</option>
+                    {adoProjects.map((p) => (
+                      <option key={p.id} value={p.name}>
+                        {p.name}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <Input
+                    id="adoProject"
+                    placeholder="Project name"
+                    value={config.adoProject}
+                    onChange={(e) => setConfig({ ...config, adoProject: e.target.value })}
+                  />
+                )}
+              </div>
+            )}
 
             {adoMessage && (
               <p className={`text-sm ${adoConnected ? 'text-green-600' : 'text-red-600'}`}>
@@ -581,6 +891,119 @@ export function ConfigurationSection({ onSaveSuccess }: ConfigurationSectionProp
           </CardContent>
         </Card>
       </div>
+
+      {/* Sync Schedule */}
+      <Card>
+        <CardHeader>
+          <div>
+            <CardTitle>Sync Schedule</CardTitle>
+            <CardDescription>Choose how often your data syncs between Notion and Azure DevOps</CardDescription>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <button
+              type="button"
+              onClick={() => setConfig({ ...config, syncSchedule: 'manual' })}
+              className={`p-4 rounded-lg border-2 text-left transition-colors ${
+                config.syncSchedule === 'manual'
+                  ? 'border-[#0D7377] bg-[#E6F4F4]'
+                  : 'border-gray-200 hover:border-gray-300'
+              }`}
+            >
+              <div className="flex items-center gap-2 mb-1">
+                <Hand className={`h-4 w-4 ${config.syncSchedule === 'manual' ? 'text-[#0D7377]' : 'text-gray-500'}`} />
+                <span className="font-medium text-sm">Manual</span>
+              </div>
+              <p className="text-xs text-gray-500">Sync only when you click Run Sync</p>
+            </button>
+            <button
+              type="button"
+              onClick={() => setConfig({ ...config, syncSchedule: 'hourly' })}
+              className={`p-4 rounded-lg border-2 text-left transition-colors ${
+                config.syncSchedule === 'hourly'
+                  ? 'border-[#0D7377] bg-[#E6F4F4]'
+                  : 'border-gray-200 hover:border-gray-300'
+              }`}
+            >
+              <div className="flex items-center gap-2 mb-1">
+                <Clock className={`h-4 w-4 ${config.syncSchedule === 'hourly' ? 'text-[#0D7377]' : 'text-gray-500'}`} />
+                <span className="font-medium text-sm">Hourly</span>
+              </div>
+              <p className="text-xs text-gray-500">Automatically sync every hour</p>
+            </button>
+            <button
+              type="button"
+              onClick={() => setConfig({ ...config, syncSchedule: 'daily' })}
+              className={`p-4 rounded-lg border-2 text-left transition-colors ${
+                config.syncSchedule === 'daily'
+                  ? 'border-[#0D7377] bg-[#E6F4F4]'
+                  : 'border-gray-200 hover:border-gray-300'
+              }`}
+            >
+              <div className="flex items-center gap-2 mb-1">
+                <CalendarClock className={`h-4 w-4 ${config.syncSchedule === 'daily' ? 'text-[#0D7377]' : 'text-gray-500'}`} />
+                <span className="font-medium text-sm">Daily</span>
+              </div>
+              <p className="text-xs text-gray-500">Automatically sync once per day at your chosen time (UTC)</p>
+            </button>
+          </div>
+          {config.syncSchedule === 'hourly' && (
+            <div className="flex flex-wrap items-center gap-3 pt-2">
+              <Label className="text-sm font-medium text-[#1C1917]">At minute</Label>
+              <select
+                value={config.syncScheduleMinute}
+                onChange={(e) => setConfig({ ...config, syncScheduleMinute: parseInt(e.target.value, 10) })}
+                className="h-9 rounded-md border border-[#E7E5E4] bg-white px-3 text-sm text-[#1C1917] focus:outline-none focus:ring-2 focus:ring-[#0D7377] focus:ring-offset-1"
+              >
+                {[0, 15, 30, 45].map((m) => (
+                  <option key={m} value={m}>
+                    :{m.toString().padStart(2, '0')}
+                  </option>
+                ))}
+              </select>
+              <span className="text-xs text-[#78716C]">of every hour (UTC)</span>
+            </div>
+          )}
+          {config.syncSchedule === 'daily' && (
+            <div className="flex flex-wrap items-center gap-3 pt-2">
+              <Label className="text-sm font-medium text-[#1C1917]">Time (UTC)</Label>
+              <select
+                value={config.syncScheduleHour}
+                onChange={(e) => setConfig({ ...config, syncScheduleHour: parseInt(e.target.value, 10) })}
+                className="h-9 rounded-md border border-[#E7E5E4] bg-white px-3 text-sm text-[#1C1917] focus:outline-none focus:ring-2 focus:ring-[#0D7377] focus:ring-offset-1"
+              >
+                {Array.from({ length: 24 }, (_, i) => (
+                  <option key={i} value={i}>
+                    {i.toString().padStart(2, '0')}:00
+                  </option>
+                ))}
+              </select>
+              <select
+                value={config.syncScheduleMinute}
+                onChange={(e) => setConfig({ ...config, syncScheduleMinute: parseInt(e.target.value, 10) })}
+                className="h-9 rounded-md border border-[#E7E5E4] bg-white px-3 text-sm text-[#1C1917] focus:outline-none focus:ring-2 focus:ring-[#0D7377] focus:ring-offset-1"
+              >
+                {[0, 15, 30, 45].map((m) => (
+                  <option key={m} value={m}>
+                    :{m.toString().padStart(2, '0')}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+          {config.syncSchedule !== 'manual' && (
+            <div className="flex items-center gap-2 text-sm text-[#0D7377] bg-[#E6F4F4] p-3 rounded-md">
+              <Clock className="h-4 w-4" />
+              <span>
+                {config.syncSchedule === 'hourly'
+                  ? `Scheduled: Syncing every hour at :${config.syncScheduleMinute.toString().padStart(2, '0')} (UTC)`
+                  : `Scheduled: Syncing daily at ${config.syncScheduleHour.toString().padStart(2, '0')}:${config.syncScheduleMinute.toString().padStart(2, '0')} UTC`}
+              </span>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Save Button */}
       <div className="flex items-center gap-4">

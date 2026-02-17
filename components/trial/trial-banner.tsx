@@ -51,12 +51,12 @@ export function TrialBanner({ accessStatus }: TrialBannerProps) {
     return (
       <div className="w-full px-4 py-3 bg-gradient-to-r from-red-500 to-rose-500 text-white flex items-center justify-center gap-2 text-sm font-medium">
         <AlertTriangle className="w-4 h-4" />
-        <span>Your trial has expired. Subscribe to continue using the app.</span>
+        <span>Your trial has expired.</span>
         <Link
           href="/pricing"
           className="ml-2 px-4 py-1.5 bg-white text-red-600 rounded-full text-xs font-semibold hover:bg-red-50 transition-all"
         >
-          View plans
+          Upgrade now to continue using atpar
         </Link>
       </div>
     );

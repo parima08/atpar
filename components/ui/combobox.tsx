@@ -39,6 +39,16 @@ export function Combobox({
     return selected?.label || '';
   }, [options, value]);
 
+  // Display value - show label if found, otherwise show truncated ID as fallback
+  const displayValue = React.useMemo(() => {
+    if (selectedLabel) return selectedLabel;
+    if (value) {
+      // Show truncated ID as fallback when label isn't found (e.g., options still loading)
+      return value.length > 20 ? `${value.substring(0, 8)}...${value.substring(value.length - 4)}` : value;
+    }
+    return '';
+  }, [selectedLabel, value]);
+
   // Filter options based on search
   const filteredOptions = React.useMemo(() => {
     if (!search) return options;
@@ -153,8 +163,8 @@ export function Combobox({
             'placeholder:text-muted-foreground',
             disabled && 'cursor-not-allowed'
           )}
-          placeholder={value ? selectedLabel : placeholder}
-          value={open ? search : (value ? selectedLabel : '')}
+          placeholder={displayValue || placeholder}
+          value={open ? search : displayValue}
           onChange={handleInputChange}
           onFocus={handleInputFocus}
           onKeyDown={handleKeyDown}

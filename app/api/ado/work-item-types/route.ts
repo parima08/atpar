@@ -2,16 +2,19 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getUser } from '@/lib/db/queries';
 import { getValidUserAdoToken } from '@/lib/ado/user-token';
 
-interface WorkItemState {
+interface WorkItemType {
   name: string;
+  description?: string;
+  icon?: {
+    url: string;
+  };
   color?: string;
-  category: string;
 }
 
 /**
- * GET /api/ado/states?org=<orgName>&project=<projectName>&type=<workItemType>
+ * GET /api/ado/work-item-types?org=<orgName>&project=<projectName>
  * 
- * Fetches available workflow states for a work item type
+ * Fetches available work item types for a project (e.g., Bug, Feature, User Story, Task)
  */
 export async function GET(request: NextRequest) {
   try {
@@ -22,11 +25,10 @@ export async function GET(request: NextRequest) {
 
     const orgName = request.nextUrl.searchParams.get('org');
     const projectName = request.nextUrl.searchParams.get('project');
-    const workItemType = request.nextUrl.searchParams.get('type');
 
-    if (!orgName || !projectName || !workItemType) {
+    if (!orgName || !projectName) {
       return NextResponse.json(
-        { error: 'Organization, project, and work item type are required' },
+        { error: 'Organization and project are required' },
         { status: 400 }
       );
     }
@@ -40,9 +42,9 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Fetch work item type details including states
+    // Fetch work item types from Azure DevOps
     const response = await fetch(
-      `https://dev.azure.com/${encodeURIComponent(orgName)}/${encodeURIComponent(projectName)}/_apis/wit/workitemtypes/${encodeURIComponent(workItemType)}?api-version=7.0`,
+      `https://dev.azure.com/${encodeURIComponent(orgName)}/${encodeURIComponent(projectName)}/_apis/wit/workitemtypes?api-version=7.0`,
       {
         headers: {
           Authorization: `Bearer ${accessToken}`,
@@ -52,25 +54,30 @@ export async function GET(request: NextRequest) {
 
     if (!response.ok) {
       const error = await response.text();
-      console.error('Failed to fetch ADO work item type details:', error);
+      console.error('Failed to fetch ADO work item types:', error);
       return NextResponse.json(
-        { error: 'Failed to fetch states' },
+        { error: 'Failed to fetch work item types' },
         { status: response.status }
       );
     }
 
     const data = await response.json();
-    const states: WorkItemState[] = data.states || [];
+    const types: WorkItemType[] = data.value || [];
 
-    const result = states.map((state) => ({
-      name: state.name,
-      color: state.color,
-      category: state.category, // 'Proposed', 'InProgress', 'Resolved', 'Completed', 'Removed'
-    }));
+    // Filter to only include common work item types (exclude system types)
+    const commonTypes = ['Bug', 'Feature', 'User Story', 'Product Backlog Item', 'Task', 'Epic', 'Issue', 'Impediment'];
+    
+    const result = types
+      .filter((type) => commonTypes.includes(type.name) || !type.name.startsWith('Microsoft.'))
+      .map((type) => ({
+        name: type.name,
+        description: type.description,
+        color: type.color,
+      }));
 
-    return NextResponse.json({ states: result });
+    return NextResponse.json({ workItemTypes: result });
   } catch (error) {
-    console.error('Error fetching ADO states:', error);
+    console.error('Error fetching ADO work item types:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

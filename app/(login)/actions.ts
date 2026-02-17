@@ -74,6 +74,15 @@ export const signIn = validatedAction(signInSchema, async (data, formData) => {
 
   const { user: foundUser, team: foundTeam } = userWithTeam[0];
 
+  // Check if user has a password (Microsoft users may not have one)
+  if (!foundUser.passwordHash) {
+    return {
+      error: 'This account uses Microsoft sign-in. Please use "Continue with Microsoft" to sign in.',
+      email,
+      password
+    };
+  }
+
   const isPasswordValid = await comparePasswords(
     password,
     foundUser.passwordHash
@@ -118,7 +127,7 @@ export const signUp = validatedAction(signUpSchema, async (data, formData) => {
 
   if (existingUser.length > 0) {
     return {
-      error: 'Failed to create user. Please try again.',
+      error: 'An account with this email already exists. Please sign in instead.',
       email,
       password
     };

@@ -40,10 +40,10 @@ export default function RootLayout({
         <SWRConfig
           value={{
             fallback: {
-              // We do NOT await here
-              // Only components that read this data will suspend
-              '/api/user': getUser(),
-              '/api/team': getTeamForUser()
+              // We do NOT await here; components that read this data will suspend.
+              // If DB is unreachable (e.g. POSTGRES_URL missing or fetch failed), resolve to null so the app still renders.
+              '/api/user': getUser().catch(() => null),
+              '/api/team': getTeamForUser().catch(() => null)
             }
           }}
         >

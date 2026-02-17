@@ -15,5 +15,10 @@ export function useIsMobile() {
     return () => mql.removeEventListener("change", onChange)
   }, [])
 
-  return !!isMobile
+  return isMobile
+}
+
+export function useIsMobileReady() {
+  const isMobile = useIsMobile()
+  return isMobile !== undefined
 }

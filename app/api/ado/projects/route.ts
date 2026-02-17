@@ -2,16 +2,17 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getUser } from '@/lib/db/queries';
 import { getValidUserAdoToken } from '@/lib/ado/user-token';
 
-interface WorkItemState {
+interface AdoProject {
+  id: string;
   name: string;
-  color?: string;
-  category: string;
+  description?: string;
+  state: string;
 }
 
 /**
- * GET /api/ado/states?org=<orgName>&project=<projectName>&type=<workItemType>
+ * GET /api/ado/projects?org=<orgName> - Fetches ADO projects for an organization
  * 
- * Fetches available workflow states for a work item type
+ * Requires the user to be authenticated with Microsoft OAuth
  */
 export async function GET(request: NextRequest) {
   try {
@@ -21,12 +22,9 @@ export async function GET(request: NextRequest) {
     }
 
     const orgName = request.nextUrl.searchParams.get('org');
-    const projectName = request.nextUrl.searchParams.get('project');
-    const workItemType = request.nextUrl.searchParams.get('type');
-
-    if (!orgName || !projectName || !workItemType) {
+    if (!orgName) {
       return NextResponse.json(
-        { error: 'Organization, project, and work item type are required' },
+        { error: 'Organization name is required' },
         { status: 400 }
       );
     }
@@ -40,9 +38,9 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Fetch work item type details including states
+    // Fetch projects from Azure DevOps
     const response = await fetch(
-      `https://dev.azure.com/${encodeURIComponent(orgName)}/${encodeURIComponent(projectName)}/_apis/wit/workitemtypes/${encodeURIComponent(workItemType)}?api-version=7.0`,
+      `https://dev.azure.com/${encodeURIComponent(orgName)}/_apis/projects?api-version=7.0`,
       {
         headers: {
           Authorization: `Bearer ${accessToken}`,
@@ -52,25 +50,28 @@ export async function GET(request: NextRequest) {
 
     if (!response.ok) {
       const error = await response.text();
-      console.error('Failed to fetch ADO work item type details:', error);
+      console.error('Failed to fetch ADO projects:', error);
       return NextResponse.json(
-        { error: 'Failed to fetch states' },
+        { error: 'Failed to fetch projects' },
         { status: response.status }
       );
     }
 
     const data = await response.json();
-    const states: WorkItemState[] = data.states || [];
+    const projects: AdoProject[] = data.value || [];
 
-    const result = states.map((state) => ({
-      name: state.name,
-      color: state.color,
-      category: state.category, // 'Proposed', 'InProgress', 'Resolved', 'Completed', 'Removed'
-    }));
+    // Transform to a simpler format, only include wellFormed projects
+    const result = projects
+      .filter((p) => p.state === 'wellFormed')
+      .map((project) => ({
+        id: project.id,
+        name: project.name,
+        description: project.description,
+      }));
 
-    return NextResponse.json({ states: result });
+    return NextResponse.json({ projects: result });
   } catch (error) {
-    console.error('Error fetching ADO states:', error);
+    console.error('Error fetching ADO projects:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

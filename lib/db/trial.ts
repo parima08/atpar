@@ -15,32 +15,42 @@ export function getTrialEndDate(startDate: Date = new Date()): Date {
 }
 
 /**
+ * Get the trial end date for a team based on account creation date.
+ * Always calculated as createdAt + 14 days to ensure consistency.
+ */
+export function getTeamTrialEndDate(team: Team): Date {
+  return getTrialEndDate(team.createdAt);
+}
+
+/**
  * Check if a team's trial is currently active
+ * Trial is 14 days from account creation (team.createdAt)
  */
 export function isTrialActive(team: Team): boolean {
-  if (!team.trialStartedAt || !team.trialEndsAt) {
-    return false;
-  }
-  
   const now = new Date();
-  return now >= team.trialStartedAt && now < team.trialEndsAt;
+  const trialEnd = getTeamTrialEndDate(team);
+  return now < trialEnd;
 }
 
 /**
  * Check if a team's trial has expired
+ * Trial expires 14 days after account creation (team.createdAt)
  */
 export function isTrialExpired(team: Team): boolean {
-  if (!team.trialEndsAt) {
-    return false;
-  }
-  
-  return new Date() >= team.trialEndsAt;
+  const now = new Date();
+  const trialEnd = getTeamTrialEndDate(team);
+  return now >= trialEnd;
 }
 
 /**
  * Check if a team has an active subscription
+ * Must have both a Stripe subscription ID and an active/trialing status
  */
 export function hasActiveSubscription(team: Team): boolean {
+  // Must have an actual Stripe subscription to be considered active
+  if (!team.stripeSubscriptionId) {
+    return false;
+  }
   return team.subscriptionStatus === 'active' || team.subscriptionStatus === 'trialing';
 }
 
@@ -53,14 +63,11 @@ export function canAccessApp(team: Team): boolean {
 
 /**
  * Get the number of days remaining in the trial
+ * Calculated from account creation date (team.createdAt)
  */
 export function getTrialDaysRemaining(team: Team): number {
-  if (!team.trialEndsAt) {
-    return 0;
-  }
-  
   const now = new Date();
-  const endDate = new Date(team.trialEndsAt);
+  const endDate = getTeamTrialEndDate(team);
   const diffTime = endDate.getTime() - now.getTime();
   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
   
@@ -105,8 +112,8 @@ export function getTeamAccessStatus(team: Team): TeamAccessStatus {
   }
   
   // Check if trial has expired
-  if (isTrialExpired(team) && team.trialEndsAt) {
-    return { status: 'trial_expired', expiredAt: team.trialEndsAt };
+  if (isTrialExpired(team)) {
+    return { status: 'trial_expired', expiredAt: getTeamTrialEndDate(team) };
   }
   
   // No trial started and no subscription

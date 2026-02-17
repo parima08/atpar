@@ -14,8 +14,21 @@ export const users = pgTable('users', {
   id: serial('id').primaryKey(),
   name: varchar('name', { length: 100 }),
   email: varchar('email', { length: 255 }).notNull().unique(),
-  passwordHash: text('password_hash').notNull(),
+  passwordHash: text('password_hash'), // Nullable for Microsoft OAuth users
   role: varchar('role', { length: 20 }).notNull().default('member'),
+  
+  // Authentication provider
+  authProvider: varchar('auth_provider', { length: 20 }).notNull().default('email'), // 'email' | 'microsoft'
+  
+  // Microsoft OAuth fields (for users who sign in with Microsoft)
+  microsoftId: varchar('microsoft_id', { length: 255 }).unique(),
+  microsoftEmail: varchar('microsoft_email', { length: 255 }),
+  
+  // Azure DevOps OAuth tokens (linked to Microsoft login)
+  adoAccessToken: text('ado_access_token'),
+  adoRefreshToken: text('ado_refresh_token'),
+  adoTokenExpiresAt: timestamp('ado_token_expires_at'),
+  
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
   deletedAt: timestamp('deleted_at'),
@@ -144,6 +157,8 @@ export enum ActivityType {
   REMOVE_TEAM_MEMBER = 'REMOVE_TEAM_MEMBER',
   INVITE_TEAM_MEMBER = 'INVITE_TEAM_MEMBER',
   ACCEPT_INVITATION = 'ACCEPT_INVITATION',
+  MICROSOFT_SIGN_IN = 'MICROSOFT_SIGN_IN',
+  MICROSOFT_SIGN_UP = 'MICROSOFT_SIGN_UP',
 }
 
 // ============================================
@@ -177,6 +192,12 @@ export const syncConfigs = pgTable('sync_configs', {
   adoOAuthUserEmail: varchar('ado_oauth_user_email', { length: 255 }),
   adoOAuthOrgId: varchar('ado_oauth_org_id', { length: 255 }),
   adoWebhookSubscriptionId: varchar('ado_webhook_subscription_id', { length: 255 }),
+
+  // Scheduled sync settings
+  syncSchedule: varchar('sync_schedule', { length: 20 }).default('manual'), // 'manual' | 'hourly' | 'daily'
+  syncScheduleHour: integer('sync_schedule_hour').default(8), // 0-23 UTC (for daily)
+  syncScheduleMinute: integer('sync_schedule_minute').default(0), // 0-59 (for daily and hourly)
+  qstashScheduleId: varchar('qstash_schedule_id', { length: 255 }),
 
   // Notion settings - array of database IDs (up to 5)
   notionDatabaseIds: json('notion_database_ids').$type<string[]>().default([]),

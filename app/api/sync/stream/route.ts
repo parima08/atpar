@@ -1,8 +1,9 @@
 import { NextRequest } from 'next/server';
 import { db } from '@/lib/db/drizzle';
-import { syncConfigs, syncHistory } from '@/lib/db/schema';
+import { syncConfigs, syncHistory, teams } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import { getUser } from '@/lib/db/queries';
+import { canAccessApp } from '@/lib/db/trial';
 import { NotionClient, AdoClient, type SyncConfig, type SyncDirection, getValidAdoToken } from '@/lib/sync';
 import type { NotionItem, AdoWorkItem } from '@/lib/sync/types';
 
@@ -56,6 +57,23 @@ export async function POST(request: NextRequest) {
         const limit: number | undefined = body.limit;
 
         const teamId = 1;
+
+        // Check if team has access (active subscription or trial)
+        const team = await db.query.teams.findFirst({
+          where: eq(teams.id, teamId),
+        });
+
+        if (!team) {
+          send({ type: 'error', error: 'Team not found' });
+          controller.close();
+          return;
+        }
+
+        if (!canAccessApp(team)) {
+          send({ type: 'error', error: 'Your trial has expired. Please upgrade to continue using atpar.' });
+          controller.close();
+          return;
+        }
 
         const dbConfig = await db.query.syncConfigs.findFirst({
           where: eq(syncConfigs.teamId, teamId),
