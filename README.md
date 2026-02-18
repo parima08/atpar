@@ -37,7 +37,7 @@ pnpm install
 [Install](https://docs.stripe.com/stripe-cli) and log in to your Stripe account:
 
 ```bash
-stripe login
+stripe login 
 ```
 
 Use the included setup script to create your `.env` file:
