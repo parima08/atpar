@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db/drizzle';
-import { syncConfigs, users } from '@/lib/db/schema';
+import { syncConfigs, users, teamMembers } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import { getUser } from '@/lib/db/queries';
 import {
@@ -20,8 +20,11 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // For simplicity, use team ID 1 (in a real app, get from user's team)
-    const teamId = 1;
+    // Get the user's actual team
+    const teamMember = await db.query.teamMembers.findFirst({
+      where: eq(teamMembers.userId, user.id),
+    });
+    const teamId = teamMember?.teamId ?? 1;
 
     const config = await db.query.syncConfigs.findFirst({
       where: eq(syncConfigs.teamId, teamId),
@@ -101,22 +104,29 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const teamId = 1; // For simplicity, use team ID 1
+
+    // Get the user's actual team
+    const teamMember = await db.query.teamMembers.findFirst({
+      where: eq(teamMembers.userId, user.id),
+    });
+    const teamId = teamMember?.teamId ?? 1;
 
     // Check if config already exists
     const existingConfig = await db.query.syncConfigs.findFirst({
       where: eq(syncConfigs.teamId, teamId),
     });
 
-    // Build config data, only updating credentials if they're not masked
+    // Build config data, only updating fields that are present in the request body
     const configData: Record<string, unknown> = {
       teamId,
-      adoProject: body.adoProject || null,
-      adoAreaPath: body.adoAreaPath || null,
-      adoWorkType: body.adoWorkType || null,
-      notionDatabaseIds: body.notionDatabaseIds || [],
       updatedAt: new Date(),
     };
+
+    // Only update these fields if explicitly provided
+    if (body.adoProject !== undefined) configData.adoProject = body.adoProject || null;
+    if (body.adoAreaPath !== undefined) configData.adoAreaPath = body.adoAreaPath || null;
+    if (body.adoWorkType !== undefined) configData.adoWorkType = body.adoWorkType || null;
+    if (body.notionDatabaseIds !== undefined) configData.notionDatabaseIds = body.notionDatabaseIds || [];
 
     // Always save adoOrgUrl (used by both PAT and OAuth)
     if (body.adoOrgUrl !== undefined) {
@@ -176,17 +186,23 @@ export async function POST(request: NextRequest) {
           })
         : null;
 
-      if (cronExpression) {
-        if (existingScheduleId) {
-          const newScheduleId = await updateSyncSchedule(existingScheduleId, teamId, cronExpression);
-          configData.qstashScheduleId = newScheduleId;
-        } else {
-          const scheduleId = await createSyncSchedule(teamId, cronExpression);
-          configData.qstashScheduleId = scheduleId;
+      try {
+        if (cronExpression) {
+          if (existingScheduleId) {
+            const newScheduleId = await updateSyncSchedule(existingScheduleId, teamId, cronExpression);
+            configData.qstashScheduleId = newScheduleId;
+          } else {
+            const scheduleId = await createSyncSchedule(teamId, cronExpression);
+            configData.qstashScheduleId = scheduleId;
+          }
+        } else if (existingScheduleId) {
+          await deleteSyncSchedule(existingScheduleId);
+          configData.qstashScheduleId = null;
         }
-      } else if (existingScheduleId) {
-        await deleteSyncSchedule(existingScheduleId);
-        configData.qstashScheduleId = null;
+      } catch (qstashError) {
+        // QStash registration failed (e.g. localhost URLs in dev) — still save the
+        // schedule preference to the DB so it persists for production deployments.
+        console.warn('QStash schedule update failed (schedule preference still saved):', qstashError);
       }
     }
 

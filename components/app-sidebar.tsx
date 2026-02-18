@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import dynamic from 'next/dynamic';
-import { RefreshCcw, Settings, LogOut, ChevronRight, Play, Wrench, ArrowLeftRight, History, Users, Shield, Activity, Settings2 } from 'lucide-react';
+import { RefreshCcw, Settings, LogOut, ChevronRight, Play, Wrench, History, Users, Shield, Activity, Settings2 } from 'lucide-react';
 import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -64,9 +64,8 @@ const navItems: NavItem[] = [
     href: '/sync',
     icon: RefreshCcw,
     subItems: [
-      { title: 'Run Sync', id: 'run', icon: Play },
-      { title: 'Configuration', id: 'config', icon: Wrench },
-      { title: 'Mappings', id: 'mappings', icon: ArrowLeftRight },
+      { title: 'Schedule & Run', id: 'run', icon: Play },
+      { title: 'Setup', id: 'setup', icon: Wrench },
       { title: 'History', id: 'history', icon: History },
     ] as SyncSubItem[],
   },
@@ -121,18 +120,7 @@ function AppSidebarInner() {
   }
 
   const scrollToSection = (id: string) => {
-    // Navigate to /sync first if not already there
-    if (!pathname.startsWith('/sync')) {
-      router.push(`/sync#${id}`);
-      return;
-    }
-    const element = document.getElementById(id);
-    if (element) {
-      const headerOffset = 20;
-      const elementPosition = element.getBoundingClientRect().top;
-      const offsetPosition = elementPosition + window.scrollY - headerOffset;
-      window.scrollTo({ top: offsetPosition, behavior: 'smooth' });
-    }
+    router.push(`/sync?tab=${id}`);
   };
 
   return (

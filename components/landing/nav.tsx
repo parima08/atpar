@@ -111,7 +111,7 @@ export function Nav() {
               onClick={openSignUp}
               className="bg-[#F59E0B] text-[#1C1917] font-semibold hover:bg-[#D97706] hover:-translate-y-0.5 hover:shadow-lg hover:shadow-amber-500/30 transition-all rounded-lg px-5 py-2"
             >
-              Start free trial
+              Get started
             </Button>
           )}
         </div>

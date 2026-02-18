@@ -60,7 +60,7 @@ export function Hero() {
             onClick={openSignUp}
             className="bg-[#F59E0B] text-[#1C1917] font-semibold hover:bg-[#D97706] hover:-translate-y-0.5 hover:shadow-lg hover:shadow-amber-500/30 transition-all rounded-lg px-6 py-3 h-auto text-base"
           >
-            Start 14-day free trial
+            Get started with AtPar Pro
           </Button>
           <Button 
             asChild
@@ -73,7 +73,7 @@ export function Hero() {
         
         {/* Note */}
         <p className="text-sm text-[#78716C] animate-fadeInUp-delay-4">
-          No credit card required · Cancel anytime
+          Cancel anytime
         </p>
         
         {/* Product Preview */}

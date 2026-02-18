@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { Check, ChevronsUpDown, X } from 'lucide-react';
+import { Check, ChevronsUpDown, X, Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export interface ComboboxOption {
@@ -22,7 +22,7 @@ export function Combobox({
   options,
   value,
   onChange,
-  placeholder = 'Select an option...',
+  placeholder = 'Select an option…',
   disabled = false,
   className,
 }: ComboboxProps) {
@@ -43,8 +43,7 @@ export function Combobox({
   const displayValue = React.useMemo(() => {
     if (selectedLabel) return selectedLabel;
     if (value) {
-      // Show truncated ID as fallback when label isn't found (e.g., options still loading)
-      return value.length > 20 ? `${value.substring(0, 8)}...${value.substring(value.length - 4)}` : value;
+      return value.length > 20 ? `${value.substring(0, 8)}…${value.substring(value.length - 4)}` : value;
     }
     return '';
   }, [selectedLabel, value]);
@@ -53,7 +52,7 @@ export function Combobox({
   const filteredOptions = React.useMemo(() => {
     if (!search) return options;
     const searchLower = search.toLowerCase();
-    return options.filter(opt => 
+    return options.filter(opt =>
       opt.label.toLowerCase().includes(searchLower)
     );
   }, [options, search]);
@@ -107,7 +106,7 @@ export function Combobox({
         if (!open) {
           setOpen(true);
         } else {
-          setHighlightedIndex(prev => 
+          setHighlightedIndex(prev =>
             prev < filteredOptions.length - 1 ? prev + 1 : prev
           );
         }
@@ -148,20 +147,33 @@ export function Combobox({
 
   return (
     <div ref={containerRef} className={cn('relative', className)}>
+      {/* Trigger */}
       <div
         className={cn(
-          'flex items-center w-full rounded-md border border-input bg-background',
-          'ring-offset-background focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2',
-          disabled && 'opacity-50 cursor-not-allowed'
+          'flex items-center w-full rounded-lg border border-[#E7E5E4] bg-white',
+          'transition-all duration-150',
+          open
+            ? 'ring-2 ring-[#0D7377]/30 border-[#0D7377]'
+            : 'hover:border-[#0D7377]/40',
+          disabled && 'opacity-50 cursor-not-allowed bg-[#FAFAF7]',
         )}
       >
+        {/* Search icon when open, otherwise just padding */}
+        <div className="pl-3 flex items-center shrink-0">
+          {open ? (
+            <Search className="h-3.5 w-3.5 text-[#0D7377]" />
+          ) : (
+            <ChevronsUpDown className="h-3.5 w-3.5 text-[#78716C]" />
+          )}
+        </div>
+
         <input
           ref={inputRef}
           type="text"
           className={cn(
-            'flex-1 px-3 py-2 text-sm bg-transparent outline-none',
-            'placeholder:text-muted-foreground',
-            disabled && 'cursor-not-allowed'
+            'flex-1 px-2.5 py-2 text-sm bg-transparent outline-none min-w-0',
+            'placeholder:text-[#78716C]',
+            disabled && 'cursor-not-allowed',
           )}
           placeholder={displayValue || placeholder}
           value={open ? search : displayValue}
@@ -171,57 +183,78 @@ export function Combobox({
           disabled={disabled}
           autoComplete="off"
         />
-        <div className="flex items-center pr-2 gap-1">
-          {value && !disabled && (
-            <button
-              type="button"
-              onClick={handleClear}
-              className="p-1 hover:bg-accent rounded-sm"
-              aria-label="Clear selection"
-            >
-              <X className="h-4 w-4 text-muted-foreground" />
-            </button>
-          )}
-          <ChevronsUpDown className="h-4 w-4 text-muted-foreground" />
-        </div>
+
+        {/* Clear button */}
+        {value && !disabled && (
+          <button
+            type="button"
+            onClick={handleClear}
+            className="p-1.5 mr-1 hover:bg-[#F5F5F0] rounded-md transition-colors shrink-0"
+            aria-label="Clear selection"
+          >
+            <X className="h-3.5 w-3.5 text-[#78716C] hover:text-[#1C1917]" />
+          </button>
+        )}
       </div>
 
+      {/* Dropdown */}
       {open && !disabled && (
-        <ul
-          ref={listRef}
+        <div
           className={cn(
-            'absolute z-50 mt-1 w-full max-h-60 overflow-auto rounded-md border bg-popover',
-            'text-popover-foreground shadow-md'
+            'absolute z-50 mt-1.5 w-full',
+            'rounded-xl border border-[#E7E5E4] bg-white',
+            'shadow-lg shadow-black/5',
+            'overflow-hidden',
           )}
-          role="listbox"
         >
-          {filteredOptions.length === 0 ? (
-            <li className="px-3 py-2 text-sm text-muted-foreground">
-              No results found
-            </li>
-          ) : (
-            filteredOptions.map((option, index) => (
-              <li
-                key={option.value}
-                role="option"
-                aria-selected={option.value === value}
-                className={cn(
-                  'flex items-center justify-between px-3 py-2 text-sm cursor-pointer',
-                  'hover:bg-accent hover:text-accent-foreground',
-                  index === highlightedIndex && 'bg-accent text-accent-foreground',
-                  option.value === value && 'font-medium'
-                )}
-                onClick={() => handleSelect(option.value)}
-                onMouseEnter={() => setHighlightedIndex(index)}
-              >
-                <span>{option.label}</span>
-                {option.value === value && (
-                  <Check className="h-4 w-4 text-primary" />
-                )}
-              </li>
-            ))
+          {/* Search hint row */}
+          {filteredOptions.length > 0 && search === '' && (
+            <div className="flex items-center gap-2 px-3 py-2 border-b border-[#F5F5F0] bg-[#FAFAF7]">
+              <Search className="h-3 w-3 text-[#78716C]" />
+              <span className="text-xs text-[#78716C]">Type to filter…</span>
+            </div>
           )}
-        </ul>
+
+          <ul
+            ref={listRef}
+            className="max-h-52 overflow-auto py-1"
+            role="listbox"
+          >
+            {filteredOptions.length === 0 ? (
+              <li className="flex items-center gap-2 px-3 py-3 text-sm text-[#78716C]">
+                <Search className="h-3.5 w-3.5" />
+                No results for &ldquo;{search}&rdquo;
+              </li>
+            ) : (
+              filteredOptions.map((option, index) => {
+                const isSelected = option.value === value;
+                const isHighlighted = index === highlightedIndex;
+                return (
+                  <li
+                    key={option.value}
+                    role="option"
+                    aria-selected={isSelected}
+                    className={cn(
+                      'flex items-center justify-between px-3 py-2 text-sm cursor-pointer select-none',
+                      'transition-colors duration-75',
+                      isHighlighted && !isSelected && 'bg-[#F5F5F0] text-[#1C1917]',
+                      isSelected
+                        ? 'bg-[#E6F4F4] text-[#0D7377] font-medium'
+                        : 'text-[#1C1917] hover:bg-[#F5F5F0]',
+                    )}
+                    onClick={() => handleSelect(option.value)}
+                    onMouseEnter={() => setHighlightedIndex(index)}
+                  >
+                    <span className="truncate">{option.label}</span>
+                    {isSelected && (
+                      <Check className="h-3.5 w-3.5 text-[#0D7377] shrink-0 ml-2" />
+                    )}
+                  </li>
+                );
+              })
+            )}
+          </ul>
+        </div>
       )}
     </div>
   );

@@ -31,7 +31,7 @@ export default async function PricingPage() {
           Simple, transparent pricing
         </h1>
         <p className="text-lg text-gray-600">
-          Start with a 14-day free trial. No credit card required.
+          Simple pricing, cancel anytime.
         </p>
       </div>
       <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
@@ -39,7 +39,6 @@ export default async function PricingPage() {
           name="AtPar"
           price={atParPrice?.unitAmount || 5000}
           interval={atParPrice?.interval || 'month'}
-          trialDays={14}
           subtitle="$50 per team, per month"
           description="No per-seat fees. No usage limits."
           features={[
@@ -61,7 +60,6 @@ function PricingCard({
   name,
   price,
   interval,
-  trialDays,
   subtitle,
   description,
   features,
@@ -70,7 +68,6 @@ function PricingCard({
   name: string;
   price: number;
   interval: string;
-  trialDays: number;
   subtitle: string;
   description: string;
   features: string[];
@@ -80,7 +77,7 @@ function PricingCard({
     <div className="rounded-2xl border border-gray-200 bg-white p-8 shadow-sm">
       <h2 className="text-2xl font-bold text-gray-900 mb-2">{name}</h2>
       <p className="text-sm text-gray-500 mb-6">
-        {trialDays}-day free trial
+        Cancel anytime
       </p>
       <p className="text-4xl font-bold text-gray-900 mb-1">
         ${price / 100}

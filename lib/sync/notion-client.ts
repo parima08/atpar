@@ -77,15 +77,22 @@ export class NotionClient {
   }
 
   /**
-   * List accessible databases
+   * List accessible databases (paginates through all search results to return every database)
    */
   async listDatabases(): Promise<Array<{ id: string; title: string }>> {
-    // Search for all items and filter databases client-side (API filter type is limited)
-    const response = await this.client.search({
-      page_size: 100,
-    });
+    const allResults: Array<{ object: string; id: string; title?: Array<{ plain_text: string }> }> = [];
+    let cursor: string | undefined = undefined;
 
-    return (response.results as Array<{ object: string; id: string; title?: Array<{ plain_text: string }> }>)
+    do {
+      const response = await this.client.search({
+        page_size: 100,
+        start_cursor: cursor,
+      });
+      allResults.push(...(response.results as typeof allResults));
+      cursor = response.has_more && response.next_cursor ? response.next_cursor : undefined;
+    } while (cursor);
+
+    return allResults
       .filter(r => r.object === 'database' && 'title' in r)
       .map(db => ({
         id: db.id,

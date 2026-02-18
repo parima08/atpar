@@ -55,7 +55,7 @@ interface TabsListProps {
 export function TabsList({ children, className }: TabsListProps) {
   return (
     <div className={cn(
-      'flex w-full bg-[#F5F5F0] p-1 rounded-xl gap-1',
+      'flex w-full bg-[#1C1917]/8 border border-[#1C1917]/10 p-1 rounded-xl gap-1',
       className
     )}>
       {children}
@@ -78,10 +78,10 @@ export function TabsTrigger({ value, children, className }: TabsTriggerProps) {
       type="button"
       onClick={() => onValueChange(value)}
       className={cn(
-        'flex-1 py-2 px-4 text-sm font-medium rounded-lg transition-all',
-        isActive 
-          ? 'bg-white text-[#1C1917] shadow-sm' 
-          : 'text-[#78716C] hover:text-[#1C1917]',
+        'flex-1 py-2 px-4 text-sm font-semibold rounded-lg transition-all duration-150',
+        isActive
+          ? 'bg-white text-[#0D7377] shadow-sm ring-1 ring-[#0D7377]/20'
+          : 'text-[#57534E] hover:text-[#1C1917] hover:bg-white/60',
         className
       )}
     >

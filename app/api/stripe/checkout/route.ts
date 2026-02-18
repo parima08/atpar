@@ -92,6 +92,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(new URL('/dashboard', request.url));
   } catch (error) {
     console.error('Error handling successful checkout:', error);
-    return NextResponse.redirect(new URL('/error', request.url));
+    const message = error instanceof Error ? error.message : 'Checkout failed';
+    return NextResponse.redirect(new URL(`/pricing?error=${encodeURIComponent(message)}`, request.url));
   }
 }

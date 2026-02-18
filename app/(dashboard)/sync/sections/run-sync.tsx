@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -36,7 +36,16 @@ interface StreamedSyncMessage {
 
 const MAX_VISIBLE_ITEMS = 7;
 
-export function RunSyncSection() {
+interface RunSyncSectionProps {
+  /** Called whenever the running state changes — lets the parent update the sticky bar */
+  onRunningChange?: (running: boolean) => void;
+  /** Called when a sync completes — passes the ISO start time so the sticky bar can show "last synced" */
+  onSyncComplete?: (startedAt: string) => void;
+  /** Lets the parent register a callback to trigger a sync from outside (e.g. the sticky bar button) */
+  registerRunFn?: (fn: () => void) => void;
+}
+
+export function RunSyncSection({ onRunningChange, onSyncComplete, registerRunFn }: RunSyncSectionProps = {}) {
   const [direction, setDirection] = useState<SyncDirection>('both');
   const [dryRun, setDryRun] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
@@ -47,12 +56,15 @@ export function RunSyncSection() {
   const [progress, setProgress] = useState<{ current: number; total: number; phase: string } | null>(null);
   const [showAllItems, setShowAllItems] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const syncStartedAtRef = useRef<string>('');
 
   // Get visible items (last 7 or all)
   const visibleItems = showAllItems ? allItems : items.slice(-MAX_VISIBLE_ITEMS);
 
-  const runSync = async () => {
+  const runSync = useCallback(async () => {
     setIsRunning(true);
+    onRunningChange?.(true);
+    syncStartedAtRef.current = new Date().toISOString();
     setResult(null);
     setItems([]);
     setAllItems([]);
@@ -129,9 +141,17 @@ export function RunSyncSection() {
       }
     } finally {
       setIsRunning(false);
+      onRunningChange?.(false);
+      onSyncComplete?.(syncStartedAtRef.current);
       abortControllerRef.current = null;
     }
-  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [direction, dryRun]);
+
+  // Register the runSync function with the parent so the sticky bar can call it
+  useEffect(() => {
+    registerRunFn?.(runSync);
+  }, [registerRunFn, runSync]);
 
   const cancelSync = () => {
     if (abortControllerRef.current) {

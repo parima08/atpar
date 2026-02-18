@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { db } from '@/lib/db/drizzle';
 import { syncHistory } from '@/lib/db/schema';
 import { eq, desc } from 'drizzle-orm';
-import { getUser } from '@/lib/db/queries';
+import { getUser, getTeamForUser } from '@/lib/db/queries';
 
 /**
  * GET /api/sync/history - Get sync history
@@ -14,7 +14,8 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const teamId = 1; // For simplicity
+    const team = await getTeamForUser();
+    const teamId = team?.id ?? 1;
 
     const history = await db.query.syncHistory.findMany({
       where: eq(syncHistory.teamId, teamId),

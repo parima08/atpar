@@ -1,11 +1,19 @@
 'use client';
 
+import { use } from 'react';
 import { usePathname } from 'next/navigation';
 import { SidebarProvider, SidebarInset, SidebarTrigger } from '@/components/ui/sidebar';
 import { AppSidebar } from '@/components/app-sidebar';
 import { TrialGuard } from '@/components/trial';
 
-export default function Layout({ children }: { children: React.ReactNode }) {
+export default function Layout({
+  children,
+  params
+}: {
+  children: React.ReactNode;
+  params?: Promise<Record<string, string | string[]>>;
+}) {
+  if (params) use(params);
   const pathname = usePathname();
   const isHomepage = pathname === '/';
 

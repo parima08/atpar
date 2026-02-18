@@ -37,19 +37,34 @@ export async function POST(request: NextRequest) {
     }
 
     const notion = new Client({ auth: notionToken });
-    
-    // Search for all pages and filter databases client-side (API filter type is limited)
-    const response = await notion.search({
-      page_size: 100,
-    });
 
-    const databases = (response.results as Array<{ object: string; id: string; title?: Array<{ plain_text: string }>; url?: string }>)
-      .filter(r => r.object === 'database' && 'title' in r)
-      .map(db => ({
-        id: db.id,
-        title: db.title?.map(t => t.plain_text).join('') || 'Untitled',
-        url: db.url || '',
-      }));
+    // Use filter: database so Notion only returns databases (not pages), making pagination much faster
+    const allResults: Array<Record<string, unknown>> = [];
+    let cursor: string | undefined = undefined;
+
+    do {
+      const response = await notion.search({
+        filter: { value: 'database', property: 'object' },
+        page_size: 100,
+        start_cursor: cursor,
+      });
+      allResults.push(...(response.results as typeof allResults));
+      cursor = response.has_more && response.next_cursor ? response.next_cursor : undefined;
+    } while (cursor);
+
+    const databases = allResults
+      .filter(r => 'title' in r)
+      .map((db: Record<string, unknown>) => {
+        const icon = db.icon as { type?: string; emoji?: string; external?: { url: string } } | null;
+        return {
+          id: db.id as string,
+          title: (db.title as Array<{ plain_text: string }>)?.map(t => t.plain_text).join('') || 'Untitled',
+          url: (db.url as string) || '',
+          icon: icon?.type === 'emoji' ? icon.emoji : icon?.type === 'external' ? icon.external?.url : null,
+          iconType: icon?.type ?? null,
+          lastEditedTime: (db.last_edited_time as string) || null,
+        };
+      });
 
     return NextResponse.json({ databases });
   } catch (error) {
@@ -85,18 +100,33 @@ export async function GET() {
     }
 
     const notion = new Client({ auth: notionToken });
-    
-    const response = await notion.search({
-      page_size: 100,
-    });
 
-    const databases = (response.results as Array<{ object: string; id: string; title?: Array<{ plain_text: string }>; url?: string }>)
-      .filter(r => r.object === 'database' && 'title' in r)
-      .map(db => ({
-        id: db.id,
-        title: db.title?.map(t => t.plain_text).join('') || 'Untitled',
-        url: db.url || '',
-      }));
+    const allResults: Array<Record<string, unknown>> = [];
+    let cursor: string | undefined = undefined;
+
+    do {
+      const response = await notion.search({
+        filter: { value: 'database', property: 'object' },
+        page_size: 100,
+        start_cursor: cursor,
+      });
+      allResults.push(...(response.results as typeof allResults));
+      cursor = response.has_more && response.next_cursor ? response.next_cursor : undefined;
+    } while (cursor);
+
+    const databases = allResults
+      .filter(r => 'title' in r)
+      .map((db: Record<string, unknown>) => {
+        const icon = db.icon as { type?: string; emoji?: string; external?: { url: string } } | null;
+        return {
+          id: db.id as string,
+          title: (db.title as Array<{ plain_text: string }>)?.map(t => t.plain_text).join('') || 'Untitled',
+          url: (db.url as string) || '',
+          icon: icon?.type === 'emoji' ? icon.emoji : icon?.type === 'external' ? icon.external?.url : null,
+          iconType: icon?.type ?? null,
+          lastEditedTime: (db.last_edited_time as string) || null,
+        };
+      });
 
     return NextResponse.json({ databases });
   } catch (error) {
