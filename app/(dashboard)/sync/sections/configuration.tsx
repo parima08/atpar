@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { DatabaseBrowserModal, NotionDatabaseOption } from '@/components/ui/database-browser-modal';
-import { CheckCircle, XCircle, Loader2, Save, RefreshCcw, ExternalLink, ChevronDown, ChevronUp, Database, Eye, EyeOff, Link2, Unlink, Key, Building2, FolderKanban, Layers, FileType, Clock, CalendarClock, Hand, AlertCircle, Plus, X as XIcon } from 'lucide-react';
+import { CheckCircle, XCircle, Loader2, Save, RefreshCcw, ExternalLink, ChevronDown, ChevronUp, Database, Eye, EyeOff, Link2, Unlink, Key, Building2, FolderKanban, Layers, FileType, Clock, CalendarClock, Hand, AlertCircle, Plus, X as XIcon, ArrowLeftRight, ArrowRight, ArrowLeft } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 type NotionDatabase = NotionDatabaseOption;
@@ -460,7 +460,7 @@ export function ConfigurationSection({ onSaveSuccess }: ConfigurationSectionProp
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
         {/* ── Azure DevOps Card ── */}
-        <Card className="border-[#E7E5E4] shadow-sm">
+        <Card className="border-[#C8C5C2] shadow-sm">
           <CardHeader className="pb-4">
             <div className="flex items-start justify-between gap-3">
               <div className="flex items-center gap-3">
@@ -656,7 +656,7 @@ export function ConfigurationSection({ onSaveSuccess }: ConfigurationSectionProp
             {/* ── Dynamic ADO dropdowns (OAuth) ── */}
             {showAdoDropdowns && (
               <div className="space-y-4 pt-1">
-                <div className="h-px bg-[#F5F5F0]" />
+                <div className="h-px bg-[#D6D3D1]" />
 
                 {/* Organization */}
                 <div className="space-y-1.5">
@@ -835,7 +835,7 @@ export function ConfigurationSection({ onSaveSuccess }: ConfigurationSectionProp
         </Card>
 
         {/* ── Notion Card ── */}
-        <Card className="border-[#E7E5E4] shadow-sm">
+        <Card className="border-[#C8C5C2] shadow-sm">
           <CardHeader className="pb-4">
             <div className="flex items-start justify-between gap-3">
               <div className="flex items-center gap-3">
@@ -955,7 +955,7 @@ export function ConfigurationSection({ onSaveSuccess }: ConfigurationSectionProp
 
             {/* Database selections */}
             <div className="space-y-3 pt-1">
-              <div className="h-px bg-[#F5F5F0]" />
+              <div className="h-px bg-[#D6D3D1]" />
 
               <div className="flex items-center gap-2">
                 <Database className="h-3.5 w-3.5 text-[#78716C]" />
@@ -1110,13 +1110,17 @@ export function ConfigurationSection({ onSaveSuccess }: ConfigurationSectionProp
 // Schedule & Run tab can render it independently
 // ─────────────────────────────────────────────
 
+type SyncDirection = 'both' | 'notion-to-ado' | 'ado-to-notion';
+
 interface SyncScheduleCardProps {
   schedule: 'manual' | 'hourly' | 'daily';
   scheduleHour: number;
   scheduleMinute: number;
+  syncDirection: SyncDirection;
   onScheduleChange: (schedule: 'manual' | 'hourly' | 'daily') => void;
   onHourChange: (hour: number) => void;
   onMinuteChange: (minute: number) => void;
+  onDirectionChange: (direction: SyncDirection) => void;
   onSave: () => void;
   isSaving: boolean;
   saveSuccess: boolean;
@@ -1124,29 +1128,40 @@ interface SyncScheduleCardProps {
   savedSchedule?: 'manual' | 'hourly' | 'daily';
   savedScheduleHour?: number;
   savedScheduleMinute?: number;
+  savedSyncDirection?: SyncDirection;
 }
 
 export function SyncScheduleCard({
   schedule,
   scheduleHour,
   scheduleMinute,
+  syncDirection,
   onScheduleChange,
   onHourChange,
   onMinuteChange,
+  onDirectionChange,
   onSave,
   isSaving,
   saveSuccess,
   savedSchedule,
   savedScheduleHour = 8,
   savedScheduleMinute = 0,
+  savedSyncDirection = 'both',
 }: SyncScheduleCardProps) {
   const hasUnsavedChanges = savedSchedule !== undefined && (
     schedule !== savedSchedule ||
     scheduleHour !== savedScheduleHour ||
-    scheduleMinute !== savedScheduleMinute
+    scheduleMinute !== savedScheduleMinute ||
+    syncDirection !== savedSyncDirection
   );
+
+  const directionOptions: { value: SyncDirection; icon: React.ElementType; label: string; desc: string }[] = [
+    { value: 'both', icon: ArrowLeftRight, label: 'Bidirectional', desc: 'Sync both ways' },
+    { value: 'notion-to-ado', icon: ArrowRight, label: 'Notion → ADO', desc: 'Notion to Azure DevOps' },
+    { value: 'ado-to-notion', icon: ArrowLeft, label: 'ADO → Notion', desc: 'Azure DevOps to Notion' },
+  ];
   return (
-    <Card className="border-[#E7E5E4] shadow-sm">
+    <Card className="border-[#C8C5C2] shadow-sm">
       <CardHeader className="pb-4">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
@@ -1177,6 +1192,41 @@ export function SyncScheduleCard({
         </div>
       </CardHeader>
       <CardContent className="space-y-5">
+        {/* Sync direction selector */}
+        <div>
+          <Label className="text-sm font-semibold uppercase tracking-wider text-[#78716C] mb-2.5 block">
+            Sync Direction
+          </Label>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {directionOptions.map(({ value, icon: Icon, label, desc }) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => onDirectionChange(value)}
+                className={cn(
+                  'group relative flex flex-col gap-1.5 rounded-xl border-2 px-4 py-3.5 text-left transition-all duration-150',
+                  syncDirection === value
+                    ? 'border-[#0D7377] bg-[#E6F4F4]'
+                    : 'border-[#E7E5E4] bg-white hover:border-[#0D7377]/40 hover:bg-[#E6F4F4]/40',
+                )}
+              >
+                <div className="flex items-center gap-2">
+                  <Icon className={cn('h-4 w-4 transition-colors', syncDirection === value ? 'text-[#0D7377]' : 'text-[#78716C]')} />
+                  <span className={cn('text-sm font-semibold', syncDirection === value ? 'text-[#0D7377]' : 'text-[#1C1917]')}>
+                    {label}
+                  </span>
+                </div>
+                <p className="text-xs text-[#78716C]">{desc}</p>
+                {syncDirection === value && (
+                  <span className="absolute right-2.5 top-2.5 h-2 w-2 rounded-full bg-[#0D7377]" />
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="h-px bg-[#D6D3D1]" />
+
         {/* Schedule type selector */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           {[

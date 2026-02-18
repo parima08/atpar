@@ -1,6 +1,10 @@
 import { NextResponse } from 'next/server';
 import { verifySignatureAppRouter } from '@upstash/qstash/nextjs';
 import { executeSyncForTeam } from '@/lib/sync';
+import { db } from '@/lib/db/drizzle';
+import { syncConfigs } from '@/lib/db/schema';
+import { eq } from 'drizzle-orm';
+import type { SyncDirection } from '@/lib/sync/sync-service';
 
 /**
  * POST /api/cron/sync - Called by QStash on a schedule
@@ -20,8 +24,15 @@ async function handler(request: Request) {
 
     console.log(`[Cron Sync] Running scheduled sync for team ${teamId}`);
 
+    // Look up the saved sync direction for this team (defaults to 'both')
+    const config = await db.query.syncConfigs.findFirst({
+      where: eq(syncConfigs.teamId, teamId),
+      columns: { syncDirection: true },
+    });
+    const direction: SyncDirection = (config?.syncDirection as SyncDirection) || 'both';
+
     const result = await executeSyncForTeam(teamId, {
-      direction: 'both',
+      direction,
       dryRun: false,
     });
 

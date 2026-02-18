@@ -63,6 +63,7 @@ export async function GET(request: NextRequest) {
         syncSchedule: 'manual',
         syncScheduleHour: 8,
         syncScheduleMinute: 0,
+        syncDirection: 'both',
       });
     }
 
@@ -176,6 +177,10 @@ export async function POST(request: NextRequest) {
       configData.syncSchedule = newSchedule;
       configData.syncScheduleHour = Math.min(23, Math.max(0, newHour));
       configData.syncScheduleMinute = Math.min(59, Math.max(0, newMinute));
+    }
+
+    if (body.syncDirection !== undefined) {
+      configData.syncDirection = body.syncDirection;
     }
 
     if (scheduleOrTimeChanged) {

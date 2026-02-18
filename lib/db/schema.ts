@@ -197,6 +197,7 @@ export const syncConfigs = pgTable('sync_configs', {
   syncSchedule: varchar('sync_schedule', { length: 20 }).default('manual'), // 'manual' | 'hourly' | 'daily'
   syncScheduleHour: integer('sync_schedule_hour').default(8), // 0-23 UTC (for daily)
   syncScheduleMinute: integer('sync_schedule_minute').default(0), // 0-59 (for daily and hourly)
+  syncDirection: varchar('sync_direction', { length: 50 }).default('both'), // 'both' | 'notion-to-ado' | 'ado-to-notion'
   qstashScheduleId: varchar('qstash_schedule_id', { length: 255 }),
 
   // Notion settings - array of database IDs (up to 5)

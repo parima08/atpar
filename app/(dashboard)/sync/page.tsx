@@ -89,12 +89,14 @@ function SyncDashboardInner() {
   const [schedule, setSchedule] = useState<'manual' | 'hourly' | 'daily'>('manual');
   const [scheduleHour, setScheduleHour] = useState(8);
   const [scheduleMinute, setScheduleMinute] = useState(0);
+  const [syncDirection, setSyncDirection] = useState<'both' | 'notion-to-ado' | 'ado-to-notion'>('both');
   const [isSavingSchedule, setIsSavingSchedule] = useState(false);
   const [scheduleSaveSuccess, setScheduleSaveSuccess] = useState(false);
   // Track what's actually persisted in the DB (separate from unsaved edits)
   const [savedSchedule, setSavedSchedule] = useState<'manual' | 'hourly' | 'daily'>('manual');
   const [savedScheduleHour, setSavedScheduleHour] = useState(8);
   const [savedScheduleMinute, setSavedScheduleMinute] = useState(0);
+  const [savedSyncDirection, setSavedSyncDirection] = useState<'both' | 'notion-to-ado' | 'ado-to-notion'>('both');
 
   // Ref to trigger runSync inside RunSyncSection from the sticky bar
   const runSyncRef = useRef<(() => void) | null>(null);
@@ -127,9 +129,11 @@ function SyncDashboardInner() {
         const s = data.syncSchedule || 'manual';
         const h = typeof data.syncScheduleHour === 'number' ? data.syncScheduleHour : 8;
         const m = typeof data.syncScheduleMinute === 'number' ? data.syncScheduleMinute : 0;
+        const d = data.syncDirection || 'both';
         setSchedule(s); setSavedSchedule(s);
         setScheduleHour(h); setSavedScheduleHour(h);
         setScheduleMinute(m); setSavedScheduleMinute(m);
+        setSyncDirection(d); setSavedSyncDirection(d);
       })
       .catch(() => null);
   }, []);
@@ -141,12 +145,13 @@ function SyncDashboardInner() {
       const res = await fetch('/api/config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ syncSchedule: schedule, syncScheduleHour: scheduleHour, syncScheduleMinute: scheduleMinute }),
+        body: JSON.stringify({ syncSchedule: schedule, syncScheduleHour: scheduleHour, syncScheduleMinute: scheduleMinute, syncDirection }),
       });
       if (res.ok) {
         setSavedSchedule(schedule);
         setSavedScheduleHour(scheduleHour);
         setSavedScheduleMinute(scheduleMinute);
+        setSavedSyncDirection(syncDirection);
         setScheduleSaveSuccess(true);
         setTimeout(() => setScheduleSaveSuccess(false), 3000);
       }
@@ -195,17 +200,20 @@ function SyncDashboardInner() {
                 schedule={schedule}
                 scheduleHour={scheduleHour}
                 scheduleMinute={scheduleMinute}
+                syncDirection={syncDirection}
                 onScheduleChange={setSchedule}
                 onHourChange={setScheduleHour}
                 onMinuteChange={setScheduleMinute}
+                onDirectionChange={setSyncDirection}
                 onSave={saveSchedule}
                 isSaving={isSavingSchedule}
                 saveSuccess={scheduleSaveSuccess}
                 savedSchedule={savedSchedule}
                 savedScheduleHour={savedScheduleHour}
                 savedScheduleMinute={savedScheduleMinute}
+                savedSyncDirection={savedSyncDirection}
               />
-              <div className="h-px bg-[#F5F5F0]" />
+              <div className="h-px bg-[#D6D3D1]" />
               <RunSyncSection
                 onRunningChange={setIsRunning}
                 onSyncComplete={(startedAt) => setLastSyncedAt(startedAt)}
@@ -218,7 +226,7 @@ function SyncDashboardInner() {
           <TabsContent value="setup">
             <div className="space-y-8">
               <section>
-                <div className="mb-5 flex items-start gap-3">
+                <div className="mb-5 flex items-start gap-3 border-l-4 border-[#0D7377] pl-4">
                   <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#0D7377]/10">
                     <Wrench className="h-4.5 w-4.5 text-[#0D7377]" />
                   </div>
@@ -230,10 +238,10 @@ function SyncDashboardInner() {
                 <ConfigurationSection />
               </section>
 
-              <div className="h-px bg-[#F5F5F0]" />
+              <div className="h-px bg-[#D6D3D1]" />
 
               <section>
-                <div className="mb-5 flex items-start gap-3">
+                <div className="mb-5 flex items-start gap-3 border-l-4 border-[#0D7377] pl-4">
                   <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#0D7377]/10">
                     <ArrowLeftRight className="h-4.5 w-4.5 text-[#0D7377]" />
                   </div>
@@ -249,7 +257,7 @@ function SyncDashboardInner() {
 
           {/* ── Tab 3: History ── */}
           <TabsContent value="history">
-            <div className="mb-5 flex items-start gap-3">
+            <div className="mb-5 flex items-start gap-3 border-l-4 border-[#0D7377] pl-4">
               <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#0D7377]/10">
                 <History className="h-4.5 w-4.5 text-[#0D7377]" />
               </div>

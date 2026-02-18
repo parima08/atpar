@@ -3,6 +3,7 @@ import type { Metadata, Viewport } from 'next';
 import { DM_Sans, Fraunces } from 'next/font/google';
 import { getUser, getTeamForUser } from '@/lib/db/queries';
 import { SWRConfig } from 'swr';
+import { DevWarningFilter } from '@/components/dev-warning-filter';
 
 export const metadata: Metadata = {
   title: 'Atpar — Keep Azure DevOps and Notion at parity',
@@ -37,6 +38,7 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <body className="min-h-[100dvh] bg-[#FAFAF7] font-sans text-[#1C1917] antialiased" suppressHydrationWarning>
+        <DevWarningFilter />
         <SWRConfig
           value={{
             fallback: {
