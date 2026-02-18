@@ -25,6 +25,8 @@ const iconMap: Record<ActivityType, LucideIcon> = {
   [ActivityType.REMOVE_TEAM_MEMBER]: UserMinus,
   [ActivityType.INVITE_TEAM_MEMBER]: Mail,
   [ActivityType.ACCEPT_INVITATION]: CheckCircle,
+  [ActivityType.MICROSOFT_SIGN_IN]: UserCog,
+  [ActivityType.MICROSOFT_SIGN_UP]: UserPlus,
 };
 
 function getRelativeTime(date: Date) {
@@ -63,6 +65,10 @@ function formatAction(action: ActivityType): string {
       return 'You invited a team member';
     case ActivityType.ACCEPT_INVITATION:
       return 'You accepted an invitation';
+    case ActivityType.MICROSOFT_SIGN_IN:
+      return 'You signed in with Microsoft';
+    case ActivityType.MICROSOFT_SIGN_UP:
+      return 'You signed up with Microsoft';
     default:
       return 'Unknown action occurred';
   }

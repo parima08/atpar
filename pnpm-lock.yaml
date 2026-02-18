@@ -116,6 +116,10 @@ importers:
       zod:
         specifier: ^3.24.4
         version: 3.24.4
+    devDependencies:
+      baseline-browser-mapping:
+        specifier: latest
+        version: 2.9.19
 
 packages:
 
@@ -1605,6 +1609,10 @@ packages:
   azure-devops-node-api@15.1.2:
     resolution: {integrity: sha512-PfJTGK8oaBB3e0hilF5QE5BT0axpxssZlc0pRq3Rb0XsKr4qk1Cma+jBRRz0hE+zuUsu/7cz0WTCVo+kcVvOjw==}
     engines: {node: '>= 16.0.0'}
+
+  baseline-browser-mapping@2.9.19:
+    resolution: {integrity: sha512-ipDqC8FrAl/76p2SSWKSI+H9tFwm7vYqXQrItCuiVPt26Km0jS+NzSsBWAaBusvSbQcfJG+JitdMm+wZAgTYqg==}
+    hasBin: true
 
   bcryptjs@3.0.2:
     resolution: {integrity: sha512-k38b3XOZKv60C4E2hVsXTolJWfkGRMbILBIe2IBITXciy5bOsTKot5kDrf3ZfufQtQOUN5mXceUEpU1rTl9Uog==}
@@ -3676,6 +3684,8 @@ snapshots:
     dependencies:
       tunnel: 0.0.6
       typed-rest-client: 2.1.0
+
+  baseline-browser-mapping@2.9.19: {}
 
   bcryptjs@3.0.2: {}
 

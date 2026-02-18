@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, ReactNode, Suspense } from 'react';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import useSWR from 'swr';
 import { AuthModal } from './auth-modal';
@@ -13,6 +13,7 @@ interface AuthContextValue {
   isLoading: boolean;
   openSignIn: () => void;
   openSignUp: () => void;
+  openFromUrl: (tab: 'signin' | 'signup', error?: string) => void;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -25,33 +26,21 @@ export function useAuth() {
   return context;
 }
 
-export function AuthProvider({ children }: { children: ReactNode }) {
-  const [open, setOpen] = useState(false);
-  const [defaultTab, setDefaultTab] = useState<'signin' | 'signup'>('signup');
-  const [authError, setAuthError] = useState<string | null>(null);
-  
+// Reads auth query params and opens modal; must be in Suspense because it uses useSearchParams()
+function AuthUrlSync() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
-  
-  // Fetch user data - will be null if not logged in
-  const { data: user, isLoading } = useSWR<User | null>('/api/user', fetcher);
+  const { openFromUrl } = useAuth();
 
-  // Check for auth query params on mount and when they change
   useEffect(() => {
     const authParam = searchParams.get('auth');
     const errorParam = searchParams.get('error');
     const messageParam = searchParams.get('message');
-    
+
     if (authParam === 'signin' || authParam === 'signup') {
-      setDefaultTab(authParam);
-      setOpen(true);
-      
-      // Set error message if present
-      if (errorParam) {
-        setAuthError(getErrorMessage(errorParam, messageParam));
-      }
-      
+      const error = errorParam ? getErrorMessage(errorParam, messageParam) : undefined;
+      openFromUrl(authParam, error);
       // Clean up URL (remove query params) after opening modal
       const url = new URL(window.location.href);
       url.searchParams.delete('auth');
@@ -59,7 +48,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       url.searchParams.delete('message');
       router.replace(url.pathname + url.search, { scroll: false });
     }
-  }, [searchParams, router, pathname]);
+  }, [searchParams, router, pathname, openFromUrl]);
+
+  return null;
+}
+
+export function AuthProvider({ children }: { children: ReactNode }) {
+  const [open, setOpen] = useState(false);
+  const [defaultTab, setDefaultTab] = useState<'signin' | 'signup'>('signup');
+  const [authError, setAuthError] = useState<string | null>(null);
+
+  // Fetch user data - will be null if not logged in
+  const { data: user, isLoading } = useSWR<User | null>('/api/user', fetcher);
 
   const openSignIn = () => {
     setAuthError(null);
@@ -73,6 +73,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setOpen(true);
   };
 
+  const openFromUrl = (tab: 'signin' | 'signup', error?: string) => {
+    setDefaultTab(tab);
+    setAuthError(error ?? null);
+    setOpen(true);
+  };
+
   const handleOpenChange = (newOpen: boolean) => {
     setOpen(newOpen);
     if (!newOpen) {
@@ -81,8 +87,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, isLoading, openSignIn, openSignUp }}>
+    <AuthContext.Provider value={{ user, isLoading, openSignIn, openSignUp, openFromUrl }}>
       {children}
+      <Suspense fallback={null}>
+        <AuthUrlSync />
+      </Suspense>
       <AuthModal 
         open={open} 
         onOpenChange={handleOpenChange}

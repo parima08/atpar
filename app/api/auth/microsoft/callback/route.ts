@@ -296,13 +296,11 @@ export async function GET(request: NextRequest) {
         ? await db.query.teams.findFirst({ where: eq(teams.id, teamId) })
         : null;
       if (team) {
-        const checkoutResult = await createCheckoutSession({
+        await createCheckoutSession({
           team,
           priceId: stateData.priceId,
         });
-        if ('url' in checkoutResult && checkoutResult.url) {
-          return NextResponse.redirect(checkoutResult.url);
-        }
+        // createCheckoutSession redirects internally; we only reach here if it didn't
       }
     }
 
