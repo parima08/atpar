@@ -112,7 +112,7 @@ function EnterprisePricingCard() {
       <p className="text-sm text-gray-600 mb-2">Contact us for pricing</p>
       <p className="text-sm text-gray-500 mb-6">Tailored to your organization</p>
       <a
-        href="mailto:sales@atpar.io"
+        href="mailto:atpar.app@gmail.com"
         className="block w-full text-center bg-gray-900 text-white rounded-lg py-3 px-4 font-medium hover:bg-gray-800 transition-colors mb-6"
       >
         Contact Sales

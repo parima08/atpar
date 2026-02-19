@@ -30,8 +30,8 @@ export function Footer() {
           >
             Terms
           </Link>
-          <a 
-            href="mailto:hello@atpar.io" 
+          <a
+            href="mailto:atpar.app@gmail.com"
             className="text-sm text-[#57534E] hover:text-[#0D7377] transition-colors"
           >
             Contact

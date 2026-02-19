@@ -103,11 +103,11 @@ export function TrialExpiredModal({ isOpen, expiredAt }: TrialExpiredModalProps)
           {/* Footer text */}
           <p className="text-center text-xs text-[#78716C] mt-4">
             Questions? Reach out at{' '}
-            <a 
-              href="mailto:support@atpar.io" 
+            <a
+              href="mailto:atpar.app@gmail.com"
               className="text-[#0D7377] hover:underline font-medium"
             >
-              support@atpar.io
+              atpar.app@gmail.com
             </a>
           </p>
         </div>

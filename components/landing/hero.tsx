@@ -2,7 +2,6 @@
 
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { Play } from 'lucide-react';
 import { useAuth } from '@/components/auth/auth-provider';
 
 // Notion icon
@@ -79,10 +78,17 @@ export function Hero() {
         {/* Product Preview */}
         <div className="mt-16 animate-fadeInUp-delay-5">
           <div className="bg-white border border-[#E7E5E4] rounded-2xl p-6 md:p-8 shadow-sm shadow-[#0D7377]/5">
-            <div className="bg-gradient-to-br from-[#E6F4F4] to-[#D5EDED] rounded-xl h-[300px] md:h-[400px] flex flex-col items-center justify-center text-[#0D7377] border border-dashed border-[#0D7377]/30">
-              <Play className="w-12 h-12 opacity-60 mb-2" />
-              <span className="text-sm">Product demo video</span>
-            </div>
+            <video
+              className="rounded-xl w-full h-auto"
+              controls
+              autoPlay
+              muted
+              loop
+              playsInline
+            >
+              <source src="/img/atpar-demo.mp4" type="video/mp4" />
+              Your browser does not support the video tag.
+            </video>
           </div>
         </div>
       </div>
