@@ -28,7 +28,11 @@ export const users = pgTable('users', {
   adoAccessToken: text('ado_access_token'),
   adoRefreshToken: text('ado_refresh_token'),
   adoTokenExpiresAt: timestamp('ado_token_expires_at'),
-  
+
+  // Password reset fields
+  passwordResetToken: text('password_reset_token'),
+  passwordResetExpires: timestamp('password_reset_expires'),
+
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
   deletedAt: timestamp('deleted_at'),

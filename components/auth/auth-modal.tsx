@@ -17,6 +17,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { signIn, signUp } from '@/app/(login)/actions';
 import { ActionState } from '@/lib/auth/middleware';
+import { ForgotPasswordModal } from './forgot-password-modal';
 
 // Microsoft logo SVG component
 function MicrosoftLogo({ className }: { className?: string }) {
@@ -83,82 +84,100 @@ function Divider() {
 
 function SignInForm() {
   const [showPassword, setShowPassword] = useState(false);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [state, formAction, pending] = useActionState<ActionState, FormData>(
     signIn,
     { error: '' }
   );
 
   return (
-    <div className="space-y-4">
-      <MicrosoftSignInButton />
-      
-      <Divider />
+    <>
+      <div className="space-y-4">
+        <MicrosoftSignInButton />
 
-      <form action={formAction} className="space-y-4">
-        <div className="space-y-2">
-          <Label htmlFor="signin-email" className="text-[#3D3835] font-medium">
-            Email
-          </Label>
-          <Input
-            id="signin-email"
-            name="email"
-            type="email"
-            placeholder="you@example.com"
-            defaultValue={state.email}
-            required
-            maxLength={50}
-            className="h-11 rounded-xl border-[#E7E5E4] focus:border-[#0D7377] focus:ring-[#0D7377]/20"
-          />
-        </div>
+        <Divider />
 
-        <div className="space-y-2">
-          <Label htmlFor="signin-password" className="text-[#3D3835] font-medium">
-            Password
-          </Label>
-          <div className="relative">
+        <form action={formAction} className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="signin-email" className="text-[#3D3835] font-medium">
+              Email
+            </Label>
             <Input
-              id="signin-password"
-              name="password"
-              type={showPassword ? 'text' : 'password'}
-              placeholder="Enter your password"
-              defaultValue={state.password}
+              id="signin-email"
+              name="email"
+              type="email"
+              placeholder="you@example.com"
+              defaultValue={state.email}
               required
-              minLength={8}
-              maxLength={100}
-              className="h-11 rounded-xl border-[#E7E5E4] focus:border-[#0D7377] focus:ring-[#0D7377]/20 pr-10"
+              maxLength={50}
+              className="h-11 rounded-xl border-[#E7E5E4] focus:border-[#0D7377] focus:ring-[#0D7377]/20"
             />
-            <button
-              type="button"
-              onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-[#78716C] hover:text-[#1C1917] transition-colors"
-            >
-              {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-            </button>
           </div>
-        </div>
 
-        {state?.error && (
-          <p className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded-lg">
-            {state.error}
-          </p>
-        )}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label htmlFor="signin-password" className="text-[#3D3835] font-medium">
+                Password
+              </Label>
+              <button
+                type="button"
+                onClick={() => setShowForgotPassword(true)}
+                className="text-xs text-[#0D7377] hover:underline font-medium"
+              >
+                Forgot?
+              </button>
+            </div>
+            <div className="relative">
+              <Input
+                id="signin-password"
+                name="password"
+                type={showPassword ? 'text' : 'password'}
+                placeholder="Enter your password"
+                defaultValue={state.password}
+                required
+                minLength={8}
+                maxLength={100}
+                className="h-11 rounded-xl border-[#E7E5E4] focus:border-[#0D7377] focus:ring-[#0D7377]/20 pr-10"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-[#78716C] hover:text-[#1C1917] transition-colors"
+              >
+                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
+          </div>
 
-        <Button
-          type="submit"
-          disabled={pending}
-          className="w-full h-11 bg-[#F59E0B] text-[#1C1917] font-semibold hover:bg-[#D97706] rounded-xl transition-all"
-        >
-          {pending ? (
-            <>
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              Signing in...
-            </>
-          ) : (
-            'Sign in'
+          {state?.error && (
+            <p className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded-lg">
+              {state.error}
+            </p>
           )}
-        </Button>
-      </form>
-    </div>
+
+          <Button
+            type="submit"
+            disabled={pending}
+            className="w-full h-11 bg-[#F59E0B] text-[#1C1917] font-semibold hover:bg-[#D97706] rounded-xl transition-all"
+          >
+            {pending ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Signing in...
+              </>
+            ) : (
+              'Sign in'
+            )}
+          </Button>
+        </form>
+      </div>
+
+      <ForgotPasswordModal
+        open={showForgotPassword}
+        onOpenChange={setShowForgotPassword}
+        onBackClick={() => setShowForgotPassword(false)}
+      />
+    </>
   );
 }
 

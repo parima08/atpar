@@ -77,21 +77,18 @@ export function Hero() {
         
         {/* Product Preview / Demo Video */}
         <div className="mt-16 animate-fadeInUp-delay-5">
-          <div className="bg-white border border-[#E7E5E4] rounded-2xl p-6 md:p-8 overflow-hidden">
-            <div className="w-full h-[320px] sm:h-[400px] md:h-[480px] rounded-xl bg-white overflow-hidden">
-              <video
-                src="/img/atpar-demo.mp4"
-                autoPlay
-                controls
-                playsInline
-                loop
-                muted
-                preload="auto"
-                className="block w-full h-full object-cover rounded-xl"
-              >
-                Your browser does not support the video tag.
-              </video>
-            </div>
+          <div className="bg-white border border-[#E7E5E4] rounded-2xl p-6 md:p-8 shadow-sm shadow-[#0D7377]/5">
+            <video
+              className="rounded-xl w-full h-auto"
+              controls
+              autoPlay
+              muted
+              loop
+              playsInline
+            >
+              <source src="/img/atpar-demo.mp4" type="video/mp4" />
+              Your browser does not support the video tag.
+            </video>
           </div>
         </div>
       </div>

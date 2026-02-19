@@ -4,6 +4,7 @@ import { DM_Sans, Fraunces } from 'next/font/google';
 import { getUser, getTeamForUser } from '@/lib/db/queries';
 import { SWRConfig } from 'swr';
 import { DevWarningFilter } from '@/components/dev-warning-filter';
+import { SupportBadge } from '@/components/support/support-badge';
 
 export const metadata: Metadata = {
   title: 'Atpar — Keep Azure DevOps and Notion at parity',
@@ -50,6 +51,7 @@ export default function RootLayout({
           }}
         >
           {children}
+          <SupportBadge />
         </SWRConfig>
       </body>
     </html>
