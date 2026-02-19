@@ -106,6 +106,14 @@ export async function requestPasswordReset(input: RequestResetInput) {
         error: error.errors[0].message,
       };
     }
+    // Handle missing columns error
+    if ((error as any)?.code === '42703') {
+      console.error('Database columns not yet created. Please run migrations.');
+      return {
+        success: false,
+        error: 'Password reset feature is not yet available. Please try again shortly.',
+      };
+    }
     console.error('Password reset error:', error);
     return {
       success: false,
@@ -162,6 +170,14 @@ export async function resetPassword(input: ResetPasswordInput) {
       return {
         success: false,
         error: error.errors[0].message,
+      };
+    }
+    // Handle missing columns error
+    if ((error as any)?.code === '42703') {
+      console.error('Database columns not yet created. Please run migrations.');
+      return {
+        success: false,
+        error: 'Password reset feature is not yet available. Please try again shortly.',
       };
     }
     console.error('Password reset error:', error);
