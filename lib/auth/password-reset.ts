@@ -3,7 +3,7 @@
 import { Resend } from 'resend';
 import { db } from '@/lib/db/drizzle';
 import { users } from '@/lib/db/schema';
-import { eq } from 'drizzle-orm';
+import { eq, and, gt } from 'drizzle-orm';
 import { z } from 'zod';
 import crypto from 'crypto';
 
@@ -59,11 +59,14 @@ export async function requestPasswordReset(input: RequestResetInput) {
     const hashedToken = hashToken(resetToken);
     const expiresAt = new Date(Date.now() + 1000 * 60 * 60); // 1 hour
 
-    // Store reset token in database (you'll need to add these fields to the users table)
-    await db.execute(
-      `UPDATE users SET password_reset_token = $1, password_reset_expires = $2 WHERE email = $3`,
-      [hashedToken, expiresAt, validatedInput.email]
-    );
+    // Store reset token in database
+    await db
+      .update(users)
+      .set({
+        passwordResetToken: hashedToken,
+        passwordResetExpires: expiresAt,
+      })
+      .where(eq(users.email, validatedInput.email));
 
     // Send reset email
     const resetLink = `${process.env.BASE_URL || 'http://localhost:3000'}/reset-password?token=${resetToken}`;
@@ -116,14 +119,21 @@ export async function resetPassword(input: ResetPasswordInput) {
     const validatedInput = resetPasswordSchema.parse(input);
 
     const hashedToken = hashToken(validatedInput.token);
+    const now = new Date();
 
     // Find user with valid reset token
-    const result = await db.execute(
-      `SELECT * FROM users WHERE password_reset_token = $1 AND password_reset_expires > NOW()`,
-      [hashedToken]
-    );
+    const user = await db
+      .select()
+      .from(users)
+      .where(
+        and(
+          eq(users.passwordResetToken, hashedToken),
+          gt(users.passwordResetExpires, now)
+        )
+      )
+      .limit(1);
 
-    if (!result.rows || result.rows.length === 0) {
+    if (!user || user.length === 0) {
       return {
         success: false,
         error: 'Invalid or expired reset link.',
@@ -134,10 +144,14 @@ export async function resetPassword(input: ResetPasswordInput) {
     const passwordHash = await hashPassword(validatedInput.password);
 
     // Update password and clear reset token
-    await db.execute(
-      `UPDATE users SET password_hash = $1, password_reset_token = NULL, password_reset_expires = NULL WHERE password_reset_token = $2`,
-      [passwordHash, hashedToken]
-    );
+    await db
+      .update(users)
+      .set({
+        passwordHash: passwordHash,
+        passwordResetToken: null,
+        passwordResetExpires: null,
+      })
+      .where(eq(users.passwordResetToken, hashedToken));
 
     return {
       success: true,

@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useSearchParams } from 'next/navigation';
-import { useRouter } from 'next/navigation';
+import { useState } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { Loader2, Eye, EyeOff, CheckCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
