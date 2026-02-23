@@ -105,13 +105,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 // Map error codes to user-friendly messages
 function getErrorMessage(errorCode: string, message?: string | null): string {
   const errorMessages: Record<string, string> = {
-    oauth_not_configured: 'Microsoft login is not configured. Please use email sign-in.',
-    oauth_failed: 'Failed to initiate Microsoft login. Please try again.',
+    oauth_not_configured: 'OAuth login is not configured. Please use email sign-in or try another provider.',
+    oauth_failed: 'Failed to start login. Please try again.',
     missing_code: 'Authentication was cancelled. Please try again.',
     invalid_state: 'Security check failed. Please try again.',
     token_exchange_failed: 'Failed to complete authentication. Please try again.',
     user_info_failed: 'Could not retrieve your profile. Please try again.',
-    no_email: 'No email address associated with your Microsoft account.',
+    no_email: 'No email address associated with your account.',
     callback_failed: 'Something went wrong. Please try again.',
     access_denied: 'Access was denied. You may need admin approval for this app.',
     consent_required: 'Admin approval is required for this app.',

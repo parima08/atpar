@@ -18,11 +18,15 @@ export const users = pgTable('users', {
   role: varchar('role', { length: 20 }).notNull().default('member'),
   
   // Authentication provider
-  authProvider: varchar('auth_provider', { length: 20 }).notNull().default('email'), // 'email' | 'microsoft'
+  authProvider: varchar('auth_provider', { length: 20 }).notNull().default('email'), // 'email' | 'microsoft' | 'notion'
   
   // Microsoft OAuth fields (for users who sign in with Microsoft)
   microsoftId: varchar('microsoft_id', { length: 255 }).unique(),
   microsoftEmail: varchar('microsoft_email', { length: 255 }),
+
+  // Notion OAuth fields (for users who sign in with Notion)
+  notionId: varchar('notion_id', { length: 255 }).unique(),
+  notionAccessToken: text('notion_access_token'),
   
   // Azure DevOps OAuth tokens (linked to Microsoft login)
   adoAccessToken: text('ado_access_token'),

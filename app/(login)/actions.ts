@@ -74,10 +74,11 @@ export const signIn = validatedAction(signInSchema, async (data, formData) => {
 
   const { user: foundUser, team: foundTeam } = userWithTeam[0];
 
-  // Check if user has a password (Microsoft users may not have one)
+  // Check if user has a password (OAuth users may not have one)
   if (!foundUser.passwordHash) {
+    const provider = foundUser.authProvider === 'notion' ? 'Notion' : 'Microsoft';
     return {
-      error: 'This account uses Microsoft sign-in. Please use "Continue with Microsoft" to sign in.',
+      error: `This account uses ${provider} sign-in. Please use "Continue with ${provider}" to sign in.`,
       email,
       password
     };
