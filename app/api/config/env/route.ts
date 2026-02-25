@@ -15,7 +15,10 @@ export async function GET() {
     }
 
     const team = await getTeamForUser();
-    const teamId = team?.id ?? 1;
+    if (!team) {
+      return NextResponse.json({ error: 'Team not found' }, { status: 403 });
+    }
+    const teamId = team.id;
 
     // Check credentials from database config
     const config = await db.query.syncConfigs.findFirst({

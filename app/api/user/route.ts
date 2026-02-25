@@ -1,6 +1,9 @@
-import { getUser } from '@/lib/db/queries';
+import { getSafeUser } from '@/lib/db/queries';
 
 export async function GET() {
-  const user = await getUser();
+  const user = await getSafeUser();
+  if (!user) {
+    return Response.json({ error: 'Unauthorized' }, { status: 401 });
+  }
   return Response.json(user);
 }

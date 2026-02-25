@@ -68,7 +68,6 @@ export const signIn = validatedAction(signInSchema, async (data, formData) => {
     return {
       error: 'Invalid email or password. Please try again.',
       email,
-      password
     };
   }
 
@@ -80,7 +79,6 @@ export const signIn = validatedAction(signInSchema, async (data, formData) => {
     return {
       error: `This account uses ${provider} sign-in. Please use "Continue with ${provider}" to sign in.`,
       email,
-      password
     };
   }
 
@@ -93,7 +91,6 @@ export const signIn = validatedAction(signInSchema, async (data, formData) => {
     return {
       error: 'Invalid email or password. Please try again.',
       email,
-      password
     };
   }
 
@@ -130,7 +127,6 @@ export const signUp = validatedAction(signUpSchema, async (data, formData) => {
     return {
       error: 'An account with this email already exists. Please sign in instead.',
       email,
-      password
     };
   }
 
@@ -148,7 +144,6 @@ export const signUp = validatedAction(signUpSchema, async (data, formData) => {
     return {
       error: 'Failed to create user. Please try again.',
       email,
-      password
     };
   }
 
@@ -187,7 +182,7 @@ export const signUp = validatedAction(signUpSchema, async (data, formData) => {
         .where(eq(teams.id, teamId))
         .limit(1);
     } else {
-      return { error: 'Invalid or expired invitation.', email, password };
+      return { error: 'Invalid or expired invitation.', email };
     }
   } else {
     // Create a new team if there's no invitation
@@ -236,9 +231,11 @@ export const signUp = validatedAction(signUpSchema, async (data, formData) => {
 });
 
 export async function signOut() {
-  const user = (await getUser()) as User;
-  const userWithTeam = await getUserWithTeam(user.id);
-  await logActivity(userWithTeam?.teamId, user.id, ActivityType.SIGN_OUT);
+  const user = await getUser();
+  if (user) {
+    const userWithTeam = await getUserWithTeam(user.id);
+    await logActivity(userWithTeam?.teamId, user.id, ActivityType.SIGN_OUT);
+  }
   (await cookies()).delete('session');
 }
 
@@ -255,9 +252,6 @@ export const updatePassword = validatedActionWithUser(
 
     if (!user.passwordHash) {
       return {
-        currentPassword,
-        newPassword,
-        confirmPassword,
         error: 'This account does not use a password. Sign in with your provider to change settings.'
       };
     }
@@ -269,27 +263,18 @@ export const updatePassword = validatedActionWithUser(
 
     if (!isPasswordValid) {
       return {
-        currentPassword,
-        newPassword,
-        confirmPassword,
         error: 'Current password is incorrect.'
       };
     }
 
     if (currentPassword === newPassword) {
       return {
-        currentPassword,
-        newPassword,
-        confirmPassword,
         error: 'New password must be different from the current password.'
       };
     }
 
     if (confirmPassword !== newPassword) {
       return {
-        currentPassword,
-        newPassword,
-        confirmPassword,
         error: 'New password and confirmation password do not match.'
       };
     }
@@ -322,7 +307,6 @@ export const deleteAccount = validatedActionWithUser(
 
     if (!user.passwordHash) {
       return {
-        password,
         error: 'This account does not use a password. Sign in with your provider to manage your account.'
       };
     }
@@ -330,7 +314,6 @@ export const deleteAccount = validatedActionWithUser(
     const isPasswordValid = await comparePasswords(password, user.passwordHash);
     if (!isPasswordValid) {
       return {
-        password,
         error: 'Incorrect password. Account deletion failed.'
       };
     }
@@ -402,6 +385,19 @@ export const removeTeamMember = validatedActionWithUser(
       return { error: 'User is not part of a team' };
     }
 
+    // Only owners can remove team members
+    const actingMember = await db.query.teamMembers.findFirst({
+      where: and(
+        eq(teamMembers.userId, user.id),
+        eq(teamMembers.teamId, userWithTeam.teamId)
+      ),
+      columns: { role: true },
+    });
+
+    if (actingMember?.role !== 'owner') {
+      return { error: 'Only team owners can remove members' };
+    }
+
     await db
       .delete(teamMembers)
       .where(
@@ -434,6 +430,19 @@ export const inviteTeamMember = validatedActionWithUser(
 
     if (!userWithTeam?.teamId) {
       return { error: 'User is not part of a team' };
+    }
+
+    // Only owners can invite team members
+    const actingMember = await db.query.teamMembers.findFirst({
+      where: and(
+        eq(teamMembers.userId, user.id),
+        eq(teamMembers.teamId, userWithTeam.teamId)
+      ),
+      columns: { role: true },
+    });
+
+    if (actingMember?.role !== 'owner') {
+      return { error: 'Only team owners can invite members' };
     }
 
     const existingMember = await db

@@ -10,8 +10,7 @@ import { updateAccount } from '@/app/(login)/actions';
 import { User } from '@/lib/db/schema';
 import useSWR from 'swr';
 import { Suspense } from 'react';
-
-const fetcher = (url: string) => fetch(url).then((res) => res.json());
+import { fetcher } from '@/lib/fetcher';
 
 type ActionState = {
   name?: string;

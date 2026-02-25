@@ -76,17 +76,21 @@ export async function GET(request: NextRequest) {
       config.adoOAuthTokenExpiresAt && 
       new Date(config.adoOAuthTokenExpiresAt) > new Date();
 
-    // Return config with OAuth status (don't expose tokens directly)
+    // Return config with OAuth status - mask sensitive tokens
     return NextResponse.json({
       ...config,
-      notionToken: config.notionToken || '',
-      adoPat: config.adoPat || '',
+      // Send masked indicator instead of actual token values
+      notionToken: config.notionToken ? '••••••••' : '',
+      adoPat: config.adoPat ? '••••••••' : '',
+      hasNotionToken: !!config.notionToken,
+      hasAdoPat: !!config.adoPat,
       adoOAuthConnected: configOAuthConnected || userHasAdoTokens,
       adoOAuthUserEmail: config.adoOAuthUserEmail || userAdoEmail,
       userHasAdoTokens,
-      // Don't expose OAuth tokens to frontend
+      // Never expose OAuth tokens to frontend
       adoOAuthAccessToken: undefined,
       adoOAuthRefreshToken: undefined,
+      adoOAuthTokenExpiresAt: undefined,
     });
   } catch (error) {
     console.error('Error fetching config:', error);
@@ -236,12 +240,17 @@ export async function POST(request: NextRequest) {
         .returning();
     }
 
-    // Return actual credentials
+    // Return saved config with tokens masked
     const savedConfig = result[0];
     return NextResponse.json({
       ...savedConfig,
-      notionToken: savedConfig.notionToken || '',
-      adoPat: savedConfig.adoPat || '',
+      notionToken: savedConfig.notionToken ? '••••••••' : '',
+      adoPat: savedConfig.adoPat ? '••••••••' : '',
+      hasNotionToken: !!savedConfig.notionToken,
+      hasAdoPat: !!savedConfig.adoPat,
+      adoOAuthAccessToken: undefined,
+      adoOAuthRefreshToken: undefined,
+      adoOAuthTokenExpiresAt: undefined,
     });
   } catch (error) {
     console.error('Error saving config:', error);

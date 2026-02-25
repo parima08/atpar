@@ -2,6 +2,7 @@ import { eq } from 'drizzle-orm';
 import { db } from '@/lib/db/drizzle';
 import { users, teams, teamMembers } from '@/lib/db/schema';
 import { setSession } from '@/lib/auth/session';
+import { getUser } from '@/lib/db/queries';
 import { NextRequest, NextResponse } from 'next/server';
 import { stripe } from '@/lib/payments/stripe';
 import Stripe from 'stripe';
@@ -12,6 +13,12 @@ export async function GET(request: NextRequest) {
 
   if (!sessionId) {
     return NextResponse.redirect(new URL('/pricing', request.url));
+  }
+
+  // Verify the user is authenticated before processing checkout
+  const currentUser = await getUser();
+  if (!currentUser) {
+    return NextResponse.redirect(new URL('/sign-in', request.url));
   }
 
   try {
@@ -52,6 +59,11 @@ export async function GET(request: NextRequest) {
     const userId = session.client_reference_id;
     if (!userId) {
       throw new Error("No user ID found in session's client_reference_id.");
+    }
+
+    // Verify the checkout session belongs to the authenticated user
+    if (Number(userId) !== currentUser.id) {
+      throw new Error('Checkout session does not belong to the current user.');
     }
 
     const user = await db

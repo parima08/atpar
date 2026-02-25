@@ -3,6 +3,12 @@ import { SignJWT, jwtVerify } from 'jose';
 import { cookies } from 'next/headers';
 import { NewUser } from '@/lib/db/schema';
 
+if (!process.env.AUTH_SECRET || process.env.AUTH_SECRET.length < 32) {
+  throw new Error(
+    'AUTH_SECRET environment variable is missing or too short (minimum 32 characters). ' +
+    'Generate one with: openssl rand -base64 32'
+  );
+}
 const key = new TextEncoder().encode(process.env.AUTH_SECRET);
 const SALT_ROUNDS = 10;
 

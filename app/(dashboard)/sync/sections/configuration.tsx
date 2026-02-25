@@ -180,9 +180,10 @@ export function ConfigurationSection({ onSaveSuccess }: ConfigurationSectionProp
           databaseIds.push('');
         }
         setConfig({
-          notionToken: data.notionToken || '',
+          // Don't store masked token values - leave empty so user can enter new ones
+          notionToken: '',
           adoAuthType: data.adoAuthType || 'oauth',
-          adoPat: data.adoPat || '',
+          adoPat: '',
           adoOrgUrl: data.adoOrgUrl || '',
           adoProject: data.adoProject || '',
           adoAreaPath: data.adoAreaPath || '',
@@ -202,8 +203,10 @@ export function ConfigurationSection({ onSaveSuccess }: ConfigurationSectionProp
           loadAdoOrganizations();
         }
 
-        if (data.notionToken && data.notionToken.length > 20) {
-          loadNotionDatabases(data.notionToken);
+        // Use the boolean flag to determine if Notion is connected
+        if (data.hasNotionToken) {
+          setNotionConnected(true);
+          loadNotionDatabases(undefined, true);
         }
       }
     } catch (error) {
@@ -316,25 +319,32 @@ export function ConfigurationSection({ onSaveSuccess }: ConfigurationSectionProp
     }
   }, [config.adoOrgUrl, config.adoProject, adoProjects.length, adoAreas.length]);
 
-  const loadNotionDatabases = useCallback(async (token?: string) => {
+  const loadNotionDatabases = useCallback(async (
+    token?: string,
+    useSavedToken?: boolean,
+    signal?: AbortSignal,
+  ) => {
     const tokenToUse = token || config.notionToken;
 
-    if (!tokenToUse || tokenToUse.length < 20) return;
-    if (tokenToUse === lastLoadedTokenRef.current && hasLoadedDatabasesRef.current) return;
+    // If no explicit token and not using saved token, bail out
+    if (!useSavedToken && (!tokenToUse || tokenToUse.length < 20)) return;
+    if (tokenToUse && tokenToUse === lastLoadedTokenRef.current && hasLoadedDatabasesRef.current) return;
 
     setLoadingDatabases(true);
     setNotionMessage('');
 
     try {
+      // If useSavedToken, send empty body so the API reads from the DB
       const response = await fetch('/api/notion/databases', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ notionToken: tokenToUse }),
+        body: JSON.stringify(useSavedToken && !tokenToUse ? {} : { notionToken: tokenToUse }),
+        signal,
       });
       if (response.ok) {
         const data = await response.json();
         setNotionDatabases(data.databases || []);
-        lastLoadedTokenRef.current = tokenToUse;
+        lastLoadedTokenRef.current = tokenToUse || '__saved__';
         hasLoadedDatabasesRef.current = true;
         if (data.databases?.length > 0) {
           setNotionConnected(true);
@@ -349,6 +359,7 @@ export function ConfigurationSection({ onSaveSuccess }: ConfigurationSectionProp
         setNotionConnected(false);
       }
     } catch (error) {
+      if ((error as Error).name === 'AbortError') return;
       setNotionMessage('Failed to load databases');
       setNotionConnected(false);
     } finally {
@@ -362,11 +373,15 @@ export function ConfigurationSection({ onSaveSuccess }: ConfigurationSectionProp
     hasLoadedDatabasesRef.current = false;
     if (!token || token.length < 20) return;
 
+    const controller = new AbortController();
     const timer = setTimeout(() => {
-      loadNotionDatabases(token);
+      loadNotionDatabases(token, false, controller.signal);
     }, 500);
 
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
   }, [config.notionToken, loadNotionDatabases]);
 
   const testAdoConnection = async () => {

@@ -35,6 +35,9 @@ export class SyncService {
   private dryRun: boolean = false;
   private logs: string[] = [];
   private items: SyncItemDetail[] = [];
+  // Track Notion pages we modified during Notion→ADO sync so ADO→Notion
+  // doesn't incorrectly skip them due to stale timestamp comparison
+  private notionPagesModifiedBySync: Set<string> = new Set();
 
   private log(message: string) {
     console.log(message);
@@ -59,6 +62,7 @@ export class SyncService {
     this.dryRun = dryRun;
     this.logs = [];
     this.items = [];
+    this.notionPagesModifiedBySync = new Set();
 
     const result: SyncResult = {
       created: 0,
@@ -202,37 +206,43 @@ export class SyncService {
     }
 
     // Compare timestamps to determine which is newer
-    const adoChangedDate = adoItem.changedDate ? new Date(adoItem.changedDate) : null;
-    const notionEditedDate = notionItem.lastEditedTime ? new Date(notionItem.lastEditedTime) : null;
+    // Skip timestamp check for pages we modified during Notion→ADO sync
+    // (our PBI URL write inflated Notion's last_edited_time)
+    const wasModifiedBySync = this.notionPagesModifiedBySync.has(adoItem.notionId);
 
-    // If we can't determine timestamps, skip
-    if (!adoChangedDate || !notionEditedDate) {
-      this.log(`Skipping "${adoItem.title}" - cannot compare timestamps`);
-      this.addItem({
-        id: notionItem.id,
-        title: adoItem.title,
-        status: adoItem.state,
-        adoId: String(adoItem.id),
-        action: 'skipped',
-        actionDetail: 'Cannot compare timestamps',
-      });
-      result.skipped++;
-      return;
-    }
+    if (!wasModifiedBySync) {
+      const adoChangedDate = adoItem.changedDate ? new Date(adoItem.changedDate) : null;
+      const notionEditedDate = notionItem.lastEditedTime ? new Date(notionItem.lastEditedTime) : null;
 
-    // If Notion is newer or same, skip (Notion -> ADO sync will handle it)
-    if (notionEditedDate >= adoChangedDate) {
-      this.log(`Skipping "${adoItem.title}" - Notion is newer or equal`);
-      this.addItem({
-        id: notionItem.id,
-        title: adoItem.title,
-        status: adoItem.state,
-        adoId: String(adoItem.id),
-        action: 'skipped',
-        actionDetail: 'Notion is newer',
-      });
-      result.skipped++;
-      return;
+      // If we can't determine timestamps, skip
+      if (!adoChangedDate || !notionEditedDate) {
+        this.log(`Skipping "${adoItem.title}" - cannot compare timestamps`);
+        this.addItem({
+          id: notionItem.id,
+          title: adoItem.title,
+          status: adoItem.state,
+          adoId: String(adoItem.id),
+          action: 'skipped',
+          actionDetail: 'Cannot compare timestamps',
+        });
+        result.skipped++;
+        return;
+      }
+
+      // If Notion is newer or same, skip (Notion -> ADO sync will handle it)
+      if (notionEditedDate >= adoChangedDate) {
+        this.log(`Skipping "${adoItem.title}" - Notion is newer or equal`);
+        this.addItem({
+          id: notionItem.id,
+          title: adoItem.title,
+          status: adoItem.state,
+          adoId: String(adoItem.id),
+          action: 'skipped',
+          actionDetail: 'Notion is newer',
+        });
+        result.skipped++;
+        return;
+      }
     }
 
     // ADO is newer - check what changed and update Notion
@@ -381,7 +391,8 @@ export class SyncService {
 
     // Write the ADO URL back to Notion's PBI field
     await this.notionClient.updatePbiUrl(item.id, adoUrl);
-    
+    this.notionPagesModifiedBySync.add(item.id);
+
     this.log(`  Created ADO PBI #${pbi.id}: ${adoUrl}`);
 
     this.addItem({

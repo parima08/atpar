@@ -49,15 +49,45 @@ export function FieldMappingsSection() {
   }, []);
 
   useEffect(() => {
-    if (databaseId) {
-      loadNotionFields();
-    }
+    if (!databaseId) return;
+    const controller = new AbortController();
+    (async () => {
+      try {
+        const response = await fetch(`/api/notion/fields?databaseId=${databaseId}`, {
+          signal: controller.signal,
+        });
+        if (response.ok) {
+          const data = await response.json();
+          setNotionFields(data.fields || []);
+        }
+      } catch (error) {
+        if ((error as Error).name !== 'AbortError') {
+          console.error('Failed to load Notion fields:', error);
+        }
+      }
+    })();
+    return () => controller.abort();
   }, [databaseId]);
 
   useEffect(() => {
-    if (project) {
-      loadAdoStates();
-    }
+    if (!project) return;
+    const controller = new AbortController();
+    (async () => {
+      try {
+        const response = await fetch(`/api/ado/states?project=${encodeURIComponent(project)}`, {
+          signal: controller.signal,
+        });
+        if (response.ok) {
+          const data = await response.json();
+          setAdoStates(data.states || []);
+        }
+      } catch (error) {
+        if ((error as Error).name !== 'AbortError') {
+          console.error('Failed to load ADO states:', error);
+        }
+      }
+    })();
+    return () => controller.abort();
   }, [project]);
 
   const loadConfig = async () => {
@@ -74,7 +104,7 @@ export function FieldMappingsSection() {
         const dbIds = data.notionDatabaseIds || [];
         setDatabaseId(Array.isArray(dbIds) ? dbIds[0] || '' : '');
         setProject(data.adoProject || '');
-        
+
         const mappings: StatusMapping[] = Object.entries(data.statusMapping || {}).map(
           ([notionStatus, adoState]) => ({
             notionStatus,
@@ -85,30 +115,6 @@ export function FieldMappingsSection() {
       }
     } catch (error) {
       console.error('Failed to load config:', error);
-    }
-  };
-
-  const loadNotionFields = async () => {
-    try {
-      const response = await fetch(`/api/notion/fields?databaseId=${databaseId}`);
-      if (response.ok) {
-        const data = await response.json();
-        setNotionFields(data.fields || []);
-      }
-    } catch (error) {
-      console.error('Failed to load Notion fields:', error);
-    }
-  };
-
-  const loadAdoStates = async () => {
-    try {
-      const response = await fetch(`/api/ado/states?project=${encodeURIComponent(project)}`);
-      if (response.ok) {
-        const data = await response.json();
-        setAdoStates(data.states || []);
-      }
-    } catch (error) {
-      console.error('Failed to load ADO states:', error);
     }
   };
 

@@ -4,29 +4,86 @@ import { activityLogs, teamMembers, teams, users } from './schema';
 import { cookies } from 'next/headers';
 import { verifyToken } from '@/lib/auth/session';
 
-export async function getUser() {
+async function getSessionUserId(): Promise<number | null> {
   const sessionCookie = (await cookies()).get('session');
   if (!sessionCookie || !sessionCookie.value) {
     return null;
   }
 
-  const sessionData = await verifyToken(sessionCookie.value);
-  if (
-    !sessionData ||
-    !sessionData.user ||
-    typeof sessionData.user.id !== 'number'
-  ) {
-    return null;
-  }
+  try {
+    const sessionData = await verifyToken(sessionCookie.value);
+    if (
+      !sessionData ||
+      !sessionData.user ||
+      typeof sessionData.user.id !== 'number'
+    ) {
+      return null;
+    }
 
-  if (new Date(sessionData.expires) < new Date()) {
+    if (new Date(sessionData.expires) < new Date()) {
+      return null;
+    }
+
+    return sessionData.user.id;
+  } catch {
     return null;
   }
+}
+
+export async function getUser() {
+  const userId = await getSessionUserId();
+  if (!userId) return null;
 
   const user = await db
-    .select()
+    .select({
+      id: users.id,
+      name: users.name,
+      email: users.email,
+      role: users.role,
+      authProvider: users.authProvider,
+      passwordHash: users.passwordHash,
+      microsoftId: users.microsoftId,
+      microsoftEmail: users.microsoftEmail,
+      notionId: users.notionId,
+      notionAccessToken: users.notionAccessToken,
+      adoAccessToken: users.adoAccessToken,
+      adoRefreshToken: users.adoRefreshToken,
+      adoTokenExpiresAt: users.adoTokenExpiresAt,
+      passwordResetToken: users.passwordResetToken,
+      passwordResetExpires: users.passwordResetExpires,
+      createdAt: users.createdAt,
+      updatedAt: users.updatedAt,
+      deletedAt: users.deletedAt,
+    })
     .from(users)
-    .where(and(eq(users.id, sessionData.user.id), isNull(users.deletedAt)))
+    .where(and(eq(users.id, userId), isNull(users.deletedAt)))
+    .limit(1);
+
+  if (user.length === 0) {
+    return null;
+  }
+
+  return user[0];
+}
+
+/**
+ * Returns user data safe for client-side exposure (no tokens, no password hash).
+ */
+export async function getSafeUser() {
+  const userId = await getSessionUserId();
+  if (!userId) return null;
+
+  const user = await db
+    .select({
+      id: users.id,
+      name: users.name,
+      email: users.email,
+      role: users.role,
+      authProvider: users.authProvider,
+      createdAt: users.createdAt,
+    })
+    .from(users)
+    .where(and(eq(users.id, userId), isNull(users.deletedAt)))
     .limit(1);
 
   if (user.length === 0) {

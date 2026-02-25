@@ -5,8 +5,7 @@ import useSWR from 'swr';
 import { TrialBanner } from './trial-banner';
 import { TrialExpiredModal } from './trial-expired-modal';
 import { TeamAccessStatus } from '@/lib/db/trial';
-
-const fetcher = (url: string) => fetch(url).then((res) => res.json());
+import { fetcher } from '@/lib/fetcher';
 
 // Routes that don't require subscription (pricing, settings, etc.)
 const EXEMPT_ROUTES = ['/pricing', '/dashboard/general', '/dashboard/security', '/sign-in', '/sign-up'];

@@ -5,8 +5,7 @@ import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import useSWR from 'swr';
 import { AuthModal } from './auth-modal';
 import { User } from '@/lib/db/schema';
-
-const fetcher = (url: string) => fetch(url).then((res) => res.json());
+import { fetcher } from '@/lib/fetcher';
 
 interface AuthContextValue {
   user: User | null | undefined;

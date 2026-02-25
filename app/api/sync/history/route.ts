@@ -15,7 +15,10 @@ export async function GET() {
     }
 
     const team = await getTeamForUser();
-    const teamId = team?.id ?? 1;
+    if (!team) {
+      return NextResponse.json({ error: 'Team not found' }, { status: 403 });
+    }
+    const teamId = team.id;
 
     const history = await db.query.syncHistory.findMany({
       where: eq(syncHistory.teamId, teamId),

@@ -1,4 +1,4 @@
-CREATE TABLE "sync_configs" (
+CREATE TABLE IF NOT EXISTS "sync_configs" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"team_id" integer NOT NULL,
 	"notion_database_id" varchar(255),
@@ -23,7 +23,7 @@ CREATE TABLE "sync_configs" (
 	CONSTRAINT "sync_configs_team_id_unique" UNIQUE("team_id")
 );
 --> statement-breakpoint
-CREATE TABLE "sync_history" (
+CREATE TABLE IF NOT EXISTS "sync_history" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"team_id" integer NOT NULL,
 	"direction" varchar(50) NOT NULL,
@@ -40,7 +40,7 @@ CREATE TABLE "sync_history" (
 	"status" varchar(20) DEFAULT 'running' NOT NULL
 );
 --> statement-breakpoint
-ALTER TABLE "teams" ADD COLUMN "trial_started_at" timestamp;--> statement-breakpoint
-ALTER TABLE "teams" ADD COLUMN "trial_ends_at" timestamp;--> statement-breakpoint
-ALTER TABLE "sync_configs" ADD CONSTRAINT "sync_configs_team_id_teams_id_fk" FOREIGN KEY ("team_id") REFERENCES "public"."teams"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "sync_history" ADD CONSTRAINT "sync_history_team_id_teams_id_fk" FOREIGN KEY ("team_id") REFERENCES "public"."teams"("id") ON DELETE no action ON UPDATE no action;
+ALTER TABLE "teams" ADD COLUMN IF NOT EXISTS "trial_started_at" timestamp;--> statement-breakpoint
+ALTER TABLE "teams" ADD COLUMN IF NOT EXISTS "trial_ends_at" timestamp;--> statement-breakpoint
+DO $$ BEGIN ALTER TABLE "sync_configs" ADD CONSTRAINT "sync_configs_team_id_teams_id_fk" FOREIGN KEY ("team_id") REFERENCES "public"."teams"("id") ON DELETE no action ON UPDATE no action; EXCEPTION WHEN duplicate_object THEN NULL; END $$;--> statement-breakpoint
+DO $$ BEGIN ALTER TABLE "sync_history" ADD CONSTRAINT "sync_history_team_id_teams_id_fk" FOREIGN KEY ("team_id") REFERENCES "public"."teams"("id") ON DELETE no action ON UPDATE no action; EXCEPTION WHEN duplicate_object THEN NULL; END $$;
