@@ -119,7 +119,7 @@ export async function executeSyncForTeam(
   };
 
   // Create a sync history record
-  const [historyRecord] = await db
+  const historyRows = await db
     .insert(syncHistory)
     .values({
       teamId,
@@ -128,6 +128,11 @@ export async function executeSyncForTeam(
       status: 'running',
     })
     .returning();
+  const historyRecord = historyRows[0];
+
+  if (!historyRecord) {
+    throw new Error('Failed to create sync history record');
+  }
 
   try {
     // Initialize clients
@@ -181,15 +186,19 @@ export async function executeSyncForTeam(
     };
   } catch (syncError) {
     // Update history record with failure
-    await db
-      .update(syncHistory)
-      .set({
-        status: 'failed',
-        errorCount: 1,
-        errors: [{ notionId: '', title: 'Sync Error', error: String(syncError) }],
-        completedAt: new Date(),
-      })
-      .where(eq(syncHistory.id, historyRecord.id));
+    try {
+      await db
+        .update(syncHistory)
+        .set({
+          status: 'failed',
+          errorCount: 1,
+          errors: [{ notionId: '', title: 'Sync Error', error: String(syncError) }],
+          completedAt: new Date(),
+        })
+        .where(eq(syncHistory.id, historyRecord.id));
+    } catch (historyUpdateError) {
+      console.error('Failed to update sync history on error:', historyUpdateError);
+    }
 
     throw syncError;
   }

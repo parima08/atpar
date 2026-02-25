@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db/drizzle';
 import { syncConfigs } from '@/lib/db/schema';
-import { getUser } from '@/lib/db/queries';
+import { getUser, getTeamIdForUser } from '@/lib/db/queries';
 import { cookies } from 'next/headers';
 import { eq } from 'drizzle-orm';
 
@@ -153,7 +153,10 @@ export async function GET(request: NextRequest) {
       : null;
 
     // Store tokens in database
-    const teamId = 1; // For simplicity - in production, get from user's team
+    const teamId = await getTeamIdForUser();
+    if (!teamId) {
+      return NextResponse.redirect(new URL('/sync?error=team_not_found', request.url));
+    }
 
     const existingConfig = await db.query.syncConfigs.findFirst({
       where: eq(syncConfigs.teamId, teamId),

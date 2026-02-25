@@ -17,7 +17,9 @@ export async function GET(request: NextRequest) {
   try {
     // Get optional parameters from query string
     const searchParams = request.nextUrl.searchParams;
-    const redirect = searchParams.get('redirect') || '';
+    const allowedRedirects = ['', 'checkout', 'dashboard', 'sync'];
+    const redirectParam = searchParams.get('redirect') || '';
+    const redirect = allowedRedirects.includes(redirectParam) ? redirectParam : '';
     const priceId = searchParams.get('priceId') || '';
     const inviteId = searchParams.get('inviteId') || '';
 

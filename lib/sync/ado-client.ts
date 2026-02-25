@@ -480,12 +480,14 @@ export class AdoClient {
     const witApi = await this.getWitApi();
 
     // Build WIQL query to find all items tagged with from_notion
+    // Escape single quotes in project name to prevent WIQL injection
+    const safeProject = this.project.replace(/'/g, "''");
     const wiql = {
       query: `
-        SELECT [System.Id], [System.Title], [System.State], [System.AssignedTo], 
+        SELECT [System.Id], [System.Title], [System.State], [System.AssignedTo],
                [System.ChangedDate], [System.Tags], [System.Description]
         FROM WorkItems
-        WHERE [System.TeamProject] = '${this.project}'
+        WHERE [System.TeamProject] = '${safeProject}'
           AND [System.Tags] CONTAINS 'from_notion'
           AND [System.WorkItemType] = 'Product Backlog Item'
         ORDER BY [System.ChangedDate] DESC

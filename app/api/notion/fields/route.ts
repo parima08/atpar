@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Client } from '@notionhq/client';
-import { getUser } from '@/lib/db/queries';
+import { getUser, getTeamIdForUser } from '@/lib/db/queries';
 import { db } from '@/lib/db/drizzle';
 import { syncConfigs } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
@@ -35,7 +35,10 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const teamId = 1; // For simplicity
+    const teamId = await getTeamIdForUser();
+    if (!teamId) {
+      return NextResponse.json({ error: 'Team not found' }, { status: 400 });
+    }
     const config = await db.query.syncConfigs.findFirst({
       where: eq(syncConfigs.teamId, teamId),
     });

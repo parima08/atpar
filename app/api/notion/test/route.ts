@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Client } from '@notionhq/client';
-import { getUser } from '@/lib/db/queries';
+import { getUser, getTeamIdForUser } from '@/lib/db/queries';
 import { db } from '@/lib/db/drizzle';
 import { syncConfigs } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
@@ -22,7 +22,10 @@ export async function POST(request: NextRequest) {
 
     // If no token provided, try to get from team's stored config
     if (!notionToken) {
-      const teamId = 1; // For simplicity, use team ID 1
+      const teamId = await getTeamIdForUser();
+      if (!teamId) {
+        return NextResponse.json({ success: false, message: 'Team not found' });
+      }
       const config = await db.query.syncConfigs.findFirst({
         where: eq(syncConfigs.teamId, teamId),
       });

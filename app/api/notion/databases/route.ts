@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Client } from '@notionhq/client';
-import { getUser } from '@/lib/db/queries';
+import { getUser, getTeamIdForUser } from '@/lib/db/queries';
 import { db } from '@/lib/db/drizzle';
 import { syncConfigs } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
@@ -17,12 +17,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const body = await request.json();
+    const body = await request.json().catch(() => ({}));
     let notionToken = body.notionToken;
 
     // If no token provided, try to get from team's stored config
     if (!notionToken) {
-      const teamId = 1; // For simplicity, use team ID 1
+      const teamId = await getTeamIdForUser();
+      if (!teamId) {
+        return NextResponse.json({ error: 'Team not found' }, { status: 400 });
+      }
       const config = await db.query.syncConfigs.findFirst({
         where: eq(syncConfigs.teamId, teamId),
       });
@@ -86,7 +89,10 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const teamId = 1; // For simplicity, use team ID 1
+    const teamId = await getTeamIdForUser();
+    if (!teamId) {
+      return NextResponse.json({ error: 'Team not found' }, { status: 400 });
+    }
     const config = await db.query.syncConfigs.findFirst({
       where: eq(syncConfigs.teamId, teamId),
     });

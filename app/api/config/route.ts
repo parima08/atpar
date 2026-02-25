@@ -24,7 +24,10 @@ export async function GET(request: NextRequest) {
     const teamMember = await db.query.teamMembers.findFirst({
       where: eq(teamMembers.userId, user.id),
     });
-    const teamId = teamMember?.teamId ?? 1;
+        if (!teamMember?.teamId) {
+      return NextResponse.json({ error: 'Team not found' }, { status: 400 });
+    }
+    const teamId = teamMember.teamId;
 
     const config = await db.query.syncConfigs.findFirst({
       where: eq(syncConfigs.teamId, teamId),
@@ -104,13 +107,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const body = await request.json();
+    const body = await request.json().catch(() => null);
+    if (!body) {
+      return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
+    }
 
     // Get the user's actual team
     const teamMember = await db.query.teamMembers.findFirst({
       where: eq(teamMembers.userId, user.id),
     });
-    const teamId = teamMember?.teamId ?? 1;
+        if (!teamMember?.teamId) {
+      return NextResponse.json({ error: 'Team not found' }, { status: 400 });
+    }
+    const teamId = teamMember.teamId;
 
     // Check if config already exists
     const existingConfig = await db.query.syncConfigs.findFirst({

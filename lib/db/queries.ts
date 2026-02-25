@@ -75,7 +75,7 @@ export async function getUserWithTeam(userId: number) {
     .where(eq(users.id, userId))
     .limit(1);
 
-  return result[0];
+  return result.length > 0 ? result[0] : undefined;
 }
 
 export async function getActivityLogs() {
@@ -127,4 +127,18 @@ export async function getTeamForUser() {
   });
 
   return result?.team || null;
+}
+
+export async function getTeamIdForUser(): Promise<number | null> {
+  const user = await getUser();
+  if (!user) {
+    return null;
+  }
+
+  const result = await db.query.teamMembers.findFirst({
+    where: eq(teamMembers.userId, user.id),
+    columns: { teamId: true },
+  });
+
+  return result?.teamId ?? null;
 }

@@ -43,6 +43,8 @@ export async function POST(request: NextRequest) {
         controller.enqueue(encoder.encode(`data: ${JSON.stringify(message)}\n\n`));
       };
 
+      let historyRecord: { id: number } | undefined;
+
       try {
         const user = await getUser();
         if (!user) {
@@ -51,7 +53,7 @@ export async function POST(request: NextRequest) {
           return;
         }
 
-        const body = await request.json();
+        const body = await request.json().catch(() => ({}));
         const direction: SyncDirection = body.direction || 'both';
         const dryRun: boolean = body.dryRun || false;
         const limit: number | undefined = body.limit;
@@ -147,10 +149,17 @@ export async function POST(request: NextRequest) {
         };
 
         // Create history record
-        const [historyRecord] = await db
+        const historyRows = await db
           .insert(syncHistory)
           .values({ teamId, direction, dryRun, status: 'running' })
           .returning();
+        historyRecord = historyRows[0];
+
+        if (!historyRecord) {
+          send({ type: 'error', error: 'Failed to create sync history record' });
+          controller.close();
+          return;
+        }
 
         // Initialize clients
         const notionClient = new NotionClient(notionToken, notionDatabaseId, syncConfig);
@@ -583,7 +592,25 @@ export async function POST(request: NextRequest) {
           },
         });
       } catch (error) {
-        send({ type: 'error', error: error instanceof Error ? error.message : 'Sync failed' });
+        const errorMessage = error instanceof Error ? error.message : 'Sync failed';
+        send({ type: 'error', error: errorMessage });
+
+        // Update history record to 'failed' if it was created
+        try {
+          if (historyRecord?.id) {
+            await db
+              .update(syncHistory)
+              .set({
+                status: 'failed',
+                errorCount: 1,
+                errors: [{ notionId: '', title: 'Sync Error', error: errorMessage }],
+                completedAt: new Date(),
+              })
+              .where(eq(syncHistory.id, historyRecord.id));
+          }
+        } catch (historyUpdateError) {
+          console.error('Failed to update sync history on error:', historyUpdateError);
+        }
       } finally {
         controller.close();
       }

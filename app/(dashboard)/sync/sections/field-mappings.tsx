@@ -71,7 +71,8 @@ export function FieldMappingsSection() {
           assigneeMapping: data.assigneeMapping || {},
           reverseAssigneeMapping: data.reverseAssigneeMapping || {},
         });
-        setDatabaseId(data.notionDatabaseId || '');
+        const dbIds = data.notionDatabaseIds || [];
+        setDatabaseId(Array.isArray(dbIds) ? dbIds[0] || '' : '');
         setProject(data.adoProject || '');
         
         const mappings: StatusMapping[] = Object.entries(data.statusMapping || {}).map(
